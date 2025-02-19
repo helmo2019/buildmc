@@ -1,0 +1,52 @@
+{
+    "resource_pack": {
+        "1": [
+            "version_id",
+            "version_id",
+            "..."
+        ],
+        "n": [
+            "version_id",
+            "version_id",
+            "..."
+        ]
+    },
+    "data_pack": {
+        "1": [
+            "version_id",
+            "version_id",
+            "..."
+        ],
+        "n": [
+            "version_id",
+            "version_id",
+            "..."
+        ]
+    },
+    "aliases": {
+        // Versions with irregular names
+        "1.14.2-pre4": "1.14.2 Pre-Release 4",
+        "1.14.2-pre3": "1.14.2 Pre-Release 3",
+        "1.14.2-pre2": "1.14.2 Pre-Release 2",
+        "1.14.2-pre1": "1.14.2 Pre-Release 1",
+
+        "1.14.1-pre2": "1.14.1 Pre-Release 2",
+        "1.14.1-pre1": "1.14.1 Pre-Release 1",
+
+        "1.14-pre5": "1.14 Pre-Release 5",
+        "1.14-pre4": "1.14 Pre-Release 4",
+        "1.14-pre3": "1.14 Pre-Release 3",
+        "1.14-pre2": "1.14 Pre-Release 2",
+        "1.14-pre1": "1.14 Pre-Release 1",
+
+
+        // April fools
+        "potato_update": "24w14potato",                 // 2024
+        "vote_update": "23w13a_or_b",                   // 2023
+        "one_block_at_a_time": "22w13oneblockatatime",  // 2022
+        "infinite": "20w14infinite",                    // 2020
+        "3d_shareware": "3D Shareware v1.34",           // 2019
+        "trendy_update": "1.RV-Pre1",                   // 2016
+        "love_and_hugs_update": "15w14a"                // 2015
+    }
+}
