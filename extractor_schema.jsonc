@@ -1,0 +1,11 @@
+{
+    // The idea is to first extract all version.json files
+    // so I have the complete data set and can do whatever
+    // I want with it (e.g. make a map 'version -> dp format').
+    "<version name>": {
+        // version.json contents here
+    },
+    "<other version names...>": {
+        // version.json contents here
+    }
+}

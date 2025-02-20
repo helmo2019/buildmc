@@ -3,11 +3,21 @@ from concurrent.futures import Future, ProcessPoolExecutor
 
 # Shared variables
 options: Namespace = Namespace()
-pack_formats: dict[int,list[str]] | None = None
+version_meta: dict[str, dict] | None = None
 version_list: list[dict] | None = None
 worker_threads: list[Future] = []
 process_pool: ProcessPoolExecutor | None = None
 already_processed: list[str] = []
+
+def reset():
+    """Reset to default values"""
+    global options, version_meta, version_list, worker_threads, process_pool, already_processed
+    options = Namespace()
+    version_meta = None
+    version_list = None
+    worker_threads = []
+    process_pool = None
+    already_processed = []
 
 # Set up arg parser
 parser = ArgumentParser(prog='Pack Format Extractor',
@@ -22,9 +32,10 @@ parser.add_argument('--retries', '-r', nargs='?', type=int, default=3,
 parser.add_argument('--from-version', '-f', nargs='?', type=str, default='0',
                     help='Version to start from. Can be either a version name or the index in the versions list.',
                     dest='from_version')
-parser.add_argument('--to-version', '-t', nargs='?', type=str, default='17w43a',
+# 17w43a introduced data packs, but version.json is only available since 18w47b
+parser.add_argument('--to-version', '-t', nargs='?', type=str, default='18w47b',
                     help='Version to stop at. Can be either a version name or the index in the versions list.',
                     dest='to_version')
 parser.add_argument('--merge', '-m', action='store_true', default=True,
                     help='Whether to merge the extracted data into an existing output file', dest='merge')
-parser.add_argument('--output', '-o', type=str, help='Output file', default='data_pack_formats.json', dest='output')
+parser.add_argument('--output', '-o', type=str, help='Output file', default='version_meta.json', dest='output')

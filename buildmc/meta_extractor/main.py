@@ -23,7 +23,7 @@ def _find_versions():
 
     # Find the indices of the first and last version to process
     def find_index(search: str) -> int:
-        if fullmatch(r'\d+', search):
+        if fullmatch(r'-?\d+', search):
             literal_index = int(search)
             if 0 <= literal_index < len(config.version_list):
                 return literal_index
@@ -35,31 +35,18 @@ def _find_versions():
             if len(matching_indices) > 0:
                 return matching_indices[0]
             else:
-                raise ValueError(f'No such version: {config.options.from_version}')
+                raise ValueError(f"No such version: '{config.options.from_version}'")
 
     first_version_index, last_version_index = find_index(config.options.from_version), find_index(config.options.to_version)
     print(
         f'Processions versions #{first_version_index} ({version_indices[first_version_index]}) to #{last_version_index} ({version_indices[last_version_index]})')
-    version_list = config.version_list[min(first_version_index,last_version_index):max(last_version_index, first_version_index)+1]
-    print(f'new list size: {len(version_list)}')
-
-
-def _setup_workers():
-    """Distributes versions across workers and submits them to the process pool"""
-
-    # Number of version to process per thread
-    per_thread = int(ceil(len(config.version_list) / config.options.threads))
-
-    # Populate a thread pool executor
-    bandwidth_per_thread = config.options.bandwidth // config.options.threads
-    config.process_pool = ProcessPoolExecutor(config.options.threads)
-    for version_range in range(config.options.threads):
-        config.worker_threads.append(config.process_pool.submit(WorkerProcess(
-            config.version_list[version_range * per_thread: (version_range + 1) * per_thread],
-            bandwidth_per_thread, config.options.retries).start))
+    config.version_list = config.version_list[min(first_version_index,last_version_index):max(last_version_index, first_version_index)+1]
 
 def main(args: list[str] | dict | None):
     """Main entry point. """
+
+    # Reset configuration
+    config.reset()
 
     # Default to sys.argv. Can't use default
     # parameter syntax because sys.argv is mutable.
@@ -84,25 +71,31 @@ def main(args: list[str] | dict | None):
             if isfile(config.options.output):
                 with open(config.options.output, 'r') as output_file:
                     # Load JSON, converting the keys from strings to integers
-                    pack_formats = {int(key): value for key, value in json_load(output_file).items()}
-
-                    for processed_versions in pack_formats.values():
-                        config.already_processed.extend(processed_versions)
+                    config.version_meta = json_load(output_file)
             else:
-                config.pack_formats = {}
+                config.version_meta = {}
         else:
-            config.pack_formats = {}
+            config.version_meta = {}
 
         _find_versions()
     except KeyboardInterrupt:
-        exit(0)
+        return
 
     # Wait until everything is done
     try:
-        # Submit all workers
-        _setup_workers()
+        ## Distribute versions across workers and submit them to the process pool
+        # Number of version to process per thread
+        per_thread = int(ceil(len(config.version_list) / config.options.threads))
 
-        # Wait for everything to complete
+        # Populate a thread pool executor
+        bandwidth_per_thread = config.options.bandwidth // config.options.threads
+        config.process_pool = ProcessPoolExecutor(config.options.threads)
+        for version_range in range(config.options.threads):
+            config.worker_threads.append(config.process_pool.submit(WorkerProcess(
+                config.version_list[version_range * per_thread: (version_range + 1) * per_thread],
+                bandwidth_per_thread, config.options.retries).start))
+
+        ## Wait for everything to complete
         for future in as_completed(config.worker_threads):
             future.result()
 
@@ -114,19 +107,12 @@ def main(args: list[str] | dict | None):
         try:
             # Yield and store results
             for future in as_completed(config.worker_threads):
-                result = future.result()
-                for pack_format in result:
-                    # No list mapped yet; We can just use the one from the result
-                    if not pack_format in config.pack_formats:
-                        config.pack_formats[pack_format] = result[pack_format]
-                    # Extend a previously mapped list
-                    else:
-                        config.pack_formats[pack_format].extend(result[pack_format])
+                config.version_meta |= future.result()
 
             # Sort results
             sorted_results = {}
-            for key in sorted(config.pack_formats):
-                sorted_results[key] = config.pack_formats[key]
+            for key in sorted(config.version_meta):
+                sorted_results[key] = config.version_meta[key]
 
             # Write results
             with open(config.options.output, 'w') as output_json:
@@ -139,7 +125,6 @@ def main(args: list[str] | dict | None):
             #  point happen while this except block is executing so it won't be caught)
             print('Please wait a moment, the program is just finishing up...')
             pass
-
 
 if __name__ == '__main__':
     main(None)
