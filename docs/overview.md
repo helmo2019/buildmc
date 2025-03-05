@@ -51,7 +51,7 @@ class Build(api.Project):
       # The overlays are applied in the order they're configured in here!
       api.Overlay("my_overlay", api.MinecraftVersion("24w23a"), to=api.MinecraftVersion("1.21.3"))
       other_overlay = api.Overlay("other_overlay", api.MinecraftVersion("1.20.3))
-      other_overlay.process(api.Document("data/my_namespace/"))
+      other_overlay.process(api.Document("data/my_namespace/"))  # ??? what was my idea here...
     
     @staticmethod
     def platforms():

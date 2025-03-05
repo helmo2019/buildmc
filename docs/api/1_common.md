@@ -1,13 +1,15 @@
 # BuildMC Python API Documentation - Common functions documentation
 The module `buildmc.api` is hereby referred to as `api`.  
-This document details commonly used functions and classes,
-such as `MinecraftVersion`.
+This document details commonly used functions and classes.
 
 ---
 
-Usage: MinecraftVersion(*name* | *pack_format*)
+Usage: `pack_format(name) -> int`
 
-Holds information about a Minecraft version.
+Get the pack format of a version by name.
 
 **name**: The name of the Minecraft version, e.g. `1.21.4` or `24w13a`
-**pack_format**: The data pack format number of the version
+
+The pack format will
+be looked up using the output of the `buildmc.meta_extractor.main`
+module.
