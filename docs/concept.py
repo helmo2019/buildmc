@@ -1,4 +1,6 @@
 ## Project build file
+from buildmc import api
+
 class Project(api.Project):
 
     # Put any variables here...
@@ -12,7 +14,10 @@ class Project(api.Project):
         self.type("data")
         self.mc_version("1.21.4")
 
+        self.variables["some_var"] = "This can be inserted with %{some_var}!"
+
         self.dependencies["modrinth_library"] = api.Dependency.Modrinth(self, version_id="abcd1234")
+
         self.dependencies["other_modrinth_lib"] = api.Dependency.Modrinth(self, project_id="1234abcd") # Automatically finds a fitting version
         self.dependencies["direct_lib"] = api.Dependency.URL(self, url="https://somewebsite.com/datapack.zip",
                                                              sha256="your hash here")
@@ -26,11 +31,14 @@ class Project(api.Project):
         # Codeberg releases page
         self.platforms["codeberg"] = api.Platform.CodebergReleases(url="https://codeberg.org/username/repo")
         self.platforms["codeberg"].changelog = Project.readme
+        self.platforms["codeberg"].variables["download_url"] = f"{self.platforms["codeberg"].project_url()}/releases"
 
         # Modrinth
         # 'url=...' is also possible, but 'id=' is preferred
         self.platforms["modrinth"] = api.Platform.Modrinth(project_id="1kjsfw82",
                                                            readme=Project.readme,changelog=Project.changelog)
+        # Variables can be inserted in processed documents
+        self.platforms["modrinth"].variables["download_url"] = f"{self.platforms["modrinth"].project_url()}/versions"
 
     def included_documents(self):
         """Define documents to include in the build. Invoked by the build task."""
@@ -53,3 +61,6 @@ class Project(api.Project):
         # module. In both cases, the (resulting) number will be validated,
         # and an error will be raised if it is unsupported by BuildMC.
         self.overlay_add(api.Overlay("other_overlay", 50, "1.21.4"))
+
+# Call this at the end to actually start the build!
+api.main(Project)
