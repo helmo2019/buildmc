@@ -2,6 +2,8 @@
 
 from argparse import ArgumentParser
 from json import dumps as json_encode, load as json_load
+from sys import argv
+from typing import Any
 
 _direct_data_fields = ('protocol_version','world_version','name','pack_version')
 data_fields = _direct_data_fields + ('version','data_pack_version','resource_pack_version')
@@ -27,7 +29,7 @@ def get_data_field(version_id: str, version_meta: dict[str,int|str|dict[str,int]
     else:
         raise ValueError
 
-def main():
+def main(args: list[str] | dict | None):
     # Set up parser
     parser: ArgumentParser = ArgumentParser(prog='Version Data Mapping Generator',
                             description='Generate different data mappings (e.g. version name -> data pack format) from'
@@ -37,9 +39,15 @@ def main():
     parser.add_argument('index_field', choices=data_fields, help='Index data field')
     parser.add_argument('value_field', choices=data_fields, help='Value data field')
     parser.add_argument('output', help='Output JSON file')
+    parser.add_argument('--unwrap', action='store_true', help='Pass to unwrap lists that only contain one element')
+
+    # Default to sys.argv. Can't use default
+    # parameter syntax because sys.argv is mutable.
+    if args is None:
+        args = argv[1:]
 
     # Parse args
-    parsed = parser.parse_args()
+    parsed = parser.parse_args(args)
 
     # Load source data
     with open(parsed.input) as source_file:
@@ -47,7 +55,7 @@ def main():
     del source_file
 
     # Generate output data
-    output_data: dict[int|str,list] = {}
+    output_data: dict[int|str,list|Any] = {}
 
     for version, meta in source_data.items():
         index_value = get_data_field(version, meta, parsed.index_field)
@@ -62,6 +70,12 @@ def main():
 
         # Add mapped value
         destination.append(mapped_value)
+
+    # Unwrap one-element lists
+    if parsed.unwrap:
+        output_data = {key: (output_data[key][0] if len(output_data[key]) == 1 else output_data[key])
+                   for key,value in output_data.items()}
+
 
     aliases_section = ''',
     "aliases": {
@@ -100,4 +114,4 @@ def main():
                                f'{aliases_section}}}')
 
 if __name__ == '__main__':
-    main()
+    main(None)

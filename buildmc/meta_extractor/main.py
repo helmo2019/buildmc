@@ -11,8 +11,6 @@ import requests
 from . import _config as config
 from ._worker import WorkerProcess
 
-# TODO implement new output format, fix crash when CTRL+C is pressed (issue with SHA1 of 1.13-pre8? it never seems to finish.)
-
 def _find_versions():
     """Compiles the version list"""
 

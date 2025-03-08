@@ -4,6 +4,7 @@ from zipfile import ZipFile
 
 from . import _config as config
 from . import _util as util
+from .._util import download, download_json
 
 
 class WorkerProcess:
@@ -38,7 +39,7 @@ class WorkerProcess:
                     continue
 
                 # Get download URL
-                downloads = util.download_json(version_info['url'], rate_limit=self.bytes_per_second,
+                downloads = download_json(version_info['url'], rate_limit=self.bytes_per_second,
                                                   sha1_sum=version_info['sha1'])['downloads']
 
 
@@ -50,7 +51,7 @@ class WorkerProcess:
                     # Download JAR file
                     print(f"Downloading '{version_info['id']}' from '{jar_download['url']}'...", flush=True)
 
-                    if not util.download(temp_file, jar_download['url'], rate_limit=self.bytes_per_second,
+                    if not download(temp_file, jar_download['url'], rate_limit=self.bytes_per_second,
                                   retries=self.retries, sha1_sum=jar_download['sha1']):
                         print(f"Error: Download for version '{version_info['id']}' failed!")
 

@@ -30,11 +30,11 @@ parser.add_argument('--bandwidth-limit', '-b', nargs='?', type=int, default=(6 *
 parser.add_argument('--retries', '-r', nargs='?', type=int, default=3,
                     help='Number of retries in case of a failed download', dest='retries')
 parser.add_argument('--from-version', '-f', nargs='?', type=str, default='0',
-                    help='Version to start from. Can be either a version name or the index in the versions list.',
+                    help="Version to start from. Can be either a version name ('id' field in version manifest) or the index in the versions list.",
                     dest='from_version')
 # 17w43a introduced data packs, but version.json is only available since 18w47b
 parser.add_argument('--to-version', '-t', nargs='?', type=str, default='18w47b',
-                    help='Version to stop at. Can be either a version name or the index in the versions list.',
+                    help="Version to stop at. Can be either a version name ('id' field in version manifest) or the index in the versions list.",
                     dest='to_version')
 parser.add_argument('--merge', '-m', action='store_true', default=True,
                     help='Whether to merge the extracted data into an existing output file', dest='merge')
