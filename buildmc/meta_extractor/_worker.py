@@ -1,14 +1,17 @@
+from datetime import datetime
 from json import load as json_load
 from tempfile import TemporaryFile
 from zipfile import ZipFile
 
+from buildmc.util import log, log_error, log_warn
 from . import _config as config
-from . import _util as util
-from .._util import download, download_json
+from ..util import download, download_json
 
 
 class WorkerProcess:
     """A worker that processes a list of versions"""
+
+    __snapshot_18w47b_release = datetime.fromisoformat('2018-11-23T10:46:41+00:00')
 
     def __init__(self, versions: list, retries: int, bytes_per_second: int):
         # Where we'll store the results. Maps <version name> -> <version.json contents>
@@ -30,12 +33,12 @@ class WorkerProcess:
             for version_info in self.versions:
                 # If the version was already processed, skip
                 if version_info['id'] in config.version_meta:
-                    print(f"Skipping version '{version_info['id']}' as it's already been processed", flush=True)
+                    log(f"Skipping version '{version_info['id']}' as it's already been processed", flush=True)
                     continue
 
                 # Check if we can find version.json in server.jar
-                if not util.includes_version_json(version_info['releaseTime']):
-                    print(f"Skipping version '{version_info['id']}' as it does not contain version.json", flush=True)
+                if datetime.fromisoformat(version_info['releaseTime']) < WorkerProcess.__snapshot_18w47b_release:
+                    log(f"Skipping version '{version_info['id']}' as it does not contain version.json", log_warn, flush=True)
                     continue
 
                 # Get download URL
@@ -49,11 +52,11 @@ class WorkerProcess:
 
                 with TemporaryFile('w+b') as temp_file:
                     # Download JAR file
-                    print(f"Downloading '{version_info['id']}' from '{jar_download['url']}'...", flush=True)
+                    log(f"Downloading '{version_info['id']}' from '{jar_download['url']}'...", flush=True)
 
                     if not download(temp_file, jar_download['url'], rate_limit=self.bytes_per_second,
                                   retries=self.retries, sha1_sum=jar_download['sha1']):
-                        print(f"Error: Download for version '{version_info['id']}' failed!")
+                        log(f"Download for version '{version_info['id']}' failed!", log_error)
 
                     # Extract version.json
                     temp_file.seek(0)
@@ -62,7 +65,7 @@ class WorkerProcess:
                             version_json = json_load(version_json_file)
 
                     # Make the entry
-                    print(f"Successfully extracted version.json of '{version_info['id']}'", flush=True)
+                    log(f"Successfully extracted version.json of '{version_info['id']}'", flush=True)
                     self.results[version_info['id']] = version_json
         except KeyboardInterrupt:
             pass

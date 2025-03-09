@@ -1,12 +1,12 @@
 """Cache management functionality"""
 
-from os import path, makedirs
-
 import os
 import shutil
+from os import makedirs, path
+from typing import Optional
 
-from .. import _config as cfg
 from . import _logging as l
+from .. import _config as cfg
 
 
 def cache_clean_all():
@@ -17,7 +17,11 @@ def cache_clean_all():
 
 
 def cache_clean(name: str) -> bool:
-    """Clear a cache directory"""
+    """
+    Clear a cache directory
+
+    :param name: Name of directory inside 'buildmc/cache/'
+    """
 
     cache_path = f"{cfg.buildmc_root}/cache/{name}"
 
@@ -28,8 +32,14 @@ def cache_clean(name: str) -> bool:
         l.log(f"Unable to remove: '{cache_path}'", l.log_error)
         return False
 
-def cache_get(name: str, clean: bool) -> str | None:
-    """Make sure that a cache sub-directory exists. Return the absolute path or None, depending on success."""
+
+def cache_get(name: str, clean: bool) -> Optional[str]:
+    """
+    Make sure that a cache subdirectory exists. Return the absolute path or None, depending on success.
+
+    :param name: Name of directory inside 'buildmc/cache/'
+    :param clean: Whether to call cache_clean()
+    """
 
     dir_path = path.realpath(f"{cfg.buildmc_root}/cache/{name}")
 

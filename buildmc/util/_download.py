@@ -1,15 +1,27 @@
 """Utilities related to downloading & verifying files"""
 
-
+import json
 from hashlib import sha1
 from io import BytesIO
 from time import sleep, time_ns
+from typing import Optional
 
-import json
 import requests
 
-def download(fp, url: str, rate_limit: int = -1, retries: int = 3,  sha1_sum: str | None = None) -> bool:
-    """Download a file from a URL with a download rate limit (bytes / s) and verify using a SHA1 sum"""
+from . import _logging as l
+
+
+def download(fp, url: str, rate_limit: int = -1, retries: int = 3, sha1_sum: Optional[str] = None) -> bool:
+    """
+    Download a file from a URL with a download rate limit (bytes / s) and verify using a SHA1 sum
+
+    :param fp: The file to write to
+    :param url: The URL to download from
+    :param rate_limit: Maximum number of bytes to download in one second
+    :param retries: How many times to retry the download in case of failure
+    :param sha1_sum: The SHA1 checksum to use for download validation
+    :return: Whether the download was successful
+    """
 
     # Download data
     for _ in range(retries):
@@ -46,36 +58,55 @@ def download(fp, url: str, rate_limit: int = -1, retries: int = 3,  sha1_sum: st
 
             # Verify hash
             if sha1_sum is not None and not _verify_sha1(fp, sha1_sum):
-                raise ValueError
+                # This error is caught in the second except clause below
+                raise ChecksumMismatchError()
 
             # Return True if the download was successful
             return True
         except requests.HTTPError as e:
-            print(f"Warning: HTTP error occurred for '{url}': {e}")
-        except ValueError:
-            print(f"Warning: Hash mismatch for '{url}'")
+            l.log(f"HTTP error occurred for '{url}': {e}", l.log_warn)
+        except ChecksumMismatchError:
+            l.log(f"SHA1 mismatch for download of '{url}'", l.log_warn)
 
+    l.log(f"Download of '{url}' failed after {retries} attempts", l.log_error)
     return False
 
 
-
-def download_json(url: str, rate_limit: int = -1, sha1_sum: str | None = None) -> dict:
+def download_json(url: str, rate_limit: int = -1, sha1_sum: Optional[str] = None) -> dict:
     """
     Download a JSON file from a URL with a download rate limit (bytes / s) and verify using a SHA1 sum.
-    The file is downloaded into an io.StringIO object.
+    The file is downloaded into an io.BytesIO object.
+
+    :param url: The URL to download from
+    :param rate_limit: Maximum number of bytes to download in one second
+    :param sha1_sum: The SHA1 checksum to use for download validation
     """
 
     with BytesIO() as in_memory_file:
         # Download & verify file
         if download(in_memory_file, url, rate_limit=rate_limit, sha1_sum=sha1_sum):
             # Parse json
-            in_memory_file.seek(0) # IMPORTANT!!!
+            in_memory_file.seek(0)  # IMPORTANT!!!
             return json.load(in_memory_file)
         else:
-            return {}
+            return { }
+
+
+class ChecksumMismatchError(Exception):
+    """Exception raised for checksum mismatches"""
+
+
+    def __init__(self):
+        super().__init__()
+
 
 def _verify_sha1(fp, expected: str) -> bool:
-    """Compute the SHA1 hash of a file and compare it with a given hash"""
+    """
+
+    :param fp:
+    :param expected:
+    :return:
+    """
 
     file_hash = sha1()
     fp.seek(0)

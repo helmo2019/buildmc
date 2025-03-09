@@ -1,9 +1,11 @@
 """Transforms the output of buildmc.meta_extractor.main into different arrangements"""
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from json import dumps as json_encode, load as json_load
 from sys import argv
 from typing import Any
+
+from buildmc.util import log, log_error
 
 _direct_data_fields = ('protocol_version','world_version','name','pack_version')
 data_fields = _direct_data_fields + ('version','data_pack_version','resource_pack_version')
@@ -14,7 +16,15 @@ data_fields = _direct_data_fields + ('version','data_pack_version','resource_pac
 # 2.b If there is nothing mapped: map new list & append version[index data field]
 
 def get_data_field(version_id: str, version_meta: dict[str,int|str|dict[str,int]], data_field: str) -> int|str|dict[str,int]:
-    """Extract a data field from version meta data"""
+    """
+    Extract a data field from version metadata
+
+    :param version_id: Version ID. Key in the output of the Meta Extractor
+    :param version_meta: Version Meta. Value in the output of the Meta Extractor
+    :param data_field: Data field to extract
+    :return: The extracted value
+    :raise KeyError: If the data field is invalid
+    """
 
     if data_field in _direct_data_fields:
         return version_meta[data_field]
@@ -27,7 +37,7 @@ def get_data_field(version_id: str, version_meta: dict[str,int|str|dict[str,int]
             return (version_meta['pack_version']
                 ['resource' if data_field == 'resource_pack_version' else 'data'])
     else:
-        raise ValueError
+        raise KeyError(data_field)
 
 def main(args: list[str] | dict | None):
     # Set up parser
@@ -47,7 +57,13 @@ def main(args: list[str] | dict | None):
         args = argv[1:]
 
     # Parse args
-    parsed = parser.parse_args(args)
+    if isinstance(args, list):
+        parsed = parser.parse_args(args)
+    elif isinstance(args, dict):
+        parsed = Namespace(**{'unwrap': False, **args})
+    else:
+        log(f'Invalid args: Should be list or dict, but is {type(args)}')
+        return
 
     # Load source data
     with open(parsed.input) as source_file:
@@ -58,8 +74,12 @@ def main(args: list[str] | dict | None):
     output_data: dict[int|str,list|Any] = {}
 
     for version, meta in source_data.items():
-        index_value = get_data_field(version, meta, parsed.index_field)
-        mapped_value = get_data_field(version, meta, parsed.value_field)
+        try:
+            index_value = get_data_field(version, meta, parsed.index_field)
+            mapped_value = get_data_field(version, meta, parsed.value_field)
+        except KeyError as error:
+            log(f"Unknown data field '{error.args[0]}'", log_error)
+            return
 
         # Ensure there is a list mapped
         if index_value in output_data:

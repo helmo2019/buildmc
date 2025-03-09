@@ -10,9 +10,9 @@ class Project(api.Project):
     def project(self):
         """Set project meta & dependencies here. Invoked at the start of any task."""
 
-        self.pack_version("1.0")
-        self.type("data")
-        self.mc_version("1.21.4")
+        self.project_version = "1.0"
+        self.pack_type("data")
+        self.pack_format("1.21.4")
 
         self.variables["some_var"] = "This can be inserted with %{some_var}!"
 
