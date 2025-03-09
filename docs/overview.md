@@ -6,7 +6,7 @@
   - Download from modrinth
   - Download from custom location (e.g. GitHub releases)
 - Building / packaging the project
-  - Pre-processor for markdown documents (e.g. README.md): different links depending on the platform
+  - Pre-processor for Markdown documents (e.g. README.md): different links depending on the platform
     - E.g. links to modrinth pages on the README for modrinth, but links to codeberg pages
       on the README for codeberg
     - Also for changelogs

@@ -1,29 +1,30 @@
 # BuildMC - Roadmap
 ## Core Features
 1. Setting project metadata
-    - Integration with the meta extractor
-    - Cache file system
+   - [x] Integration with the meta extractor
+   - [x] Cache file system
 2. Building the pack
-   - **Document processing system**
+   - [x] Including files & assembling ZIP file
+   - [ ] **Document processing system**
 3. Dependency management
-   - Integration with [weld](https://docs.smithed.dev/weld/) for building
+   - [ ] Integration with [weld](https://docs.smithed.dev/weld/) for building
      packs with all dependencies included
-   - Support downloading from **modrinth**, **Git repositories**,
+   - [ ] Support downloading from **modrinth**, **Git repositories**,
      or raw **URLs to ZIP files**
-   - Option for whether the dependency should be bundled or not
+   - [ ] Option for whether the dependency should be bundled or not
 4. Publishing of builds
-   - Modrinth
-   - Codeberg Releases (or any other Forgejo instance)
-   - Maybe other Git hosting services that have a *Releases* feature (GitHub, GitLab)
-   - Allow inclusion of a README / other files
+   - [ ] Modrinth
+   - [ ] Codeberg Releases (or any other Forgejo instance)
+   - [ ] Maybe other Git hosting services that have a *Releases* feature (GitHub, GitLab)
+   - [ ] Allow inclusion of a README / other files
 
 ## Extra Features
 5. *(Not sure)* Patch tool
    - Utility for (hopefully) easier handling of
      pack overlays
-   - Definitions of overlays in the build script
-     - Set target pack formats & name
-   - Auto-generation of the `overlays` section in pack.mcmeta
+   - [ ] Definitions of overlays in the build script
+     - [ ] Set target pack formats & name
+   - [ ] Auto-generation of the `overlays` section in pack.mcmeta
    - Workflow for creating:
      1. Open an editing copy of any data pack file
         (including files from **bundled** dependencies!)
@@ -41,7 +42,7 @@
      3. Copy the patched file trees to the appropriately named
         overlay directories in the build directory
 6. Daemon process
-   - Start CLI with `daemon` action
-   - Communicate via a `buildmc.sock` UNIX socket file
+   - [ ] Start CLI with `daemon` action
+   - [ ] Communicate via a `buildmc.sock` UNIX socket file
      - Simply pass lines with CLI options to be executed
    - Better performance, hopefully

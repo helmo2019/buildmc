@@ -1,5 +1,5 @@
 # BuildMC Python API Documentation - Common functions documentation
-The module `buildmc.api` is hereby referred to as `api`.  
+The `buildmc.api` module is hereby referred to as `api`.  
 This document details commonly used functions and classes.
 
 ---

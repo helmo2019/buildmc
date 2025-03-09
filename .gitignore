@@ -1,2 +1,3 @@
 .venv
 tests/buildmc_debug
+testing_env/buildmc_root

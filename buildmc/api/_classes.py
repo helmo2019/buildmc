@@ -1,8 +1,11 @@
 """API classes"""
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Literal, Optional
+from glob import glob
+from os import path
+from typing import Any, Callable, Iterable, Literal, Optional
 
+from buildmc import _config as cfg
 from buildmc.util import log, log_error, pack_format_of
 
 
@@ -10,23 +13,46 @@ class Project(ABC):
     """A project managed by BuildMC"""
 
     __special_vars: dict[str, Callable[['Project'], Any]] = {
-        'project/version': lambda p: p.project_version,
+        'project/name': lambda p: p.__project_name,
+        'project/version': lambda p: p.__project_version,
         'project/pack_format': lambda p: p.__pack_format,
         'project/pack_type': lambda p: p.__pack_type
     }
 
 
     def __init__(self):
-        self.variables: dict[str, Any] = { }
         self.dependencies: dict[str, Dependency] = { }
         self.platforms: dict[str, Platform] = { }
         self.documents: dict[str, Document] = { }
         self.overlays: dict[str, Overlay] = { }
 
-        self.project_version: Optional[str] = None
-
+        self.__variables: dict[str, Any] = { }
+        self.__project_name: Optional[str] = None
+        self.__project_version: Optional[str] = None
         self.__pack_format: Optional[int] = None
         self.__pack_type: Optional[Literal['data', 'resource']] = None
+        # Files to be included in the pack build. Relative to <root dir>/../
+        self.__pack_files: list[str] = []
+
+
+    def project_version(self, project_version: str):
+        """
+        Set the project version
+
+        :param project_version: Any string
+        """
+
+        self.__project_version = project_version
+
+
+    def project_name(self, project_version: str):
+        """
+        Set the project name
+
+        :param project_version: Any string
+        """
+
+        self.__project_name = project_version
 
 
     def pack_type(self, pack_type: str):
@@ -77,6 +103,7 @@ class Project(ABC):
                                 f'{self.__pack_format}', log_error)
                 elif isinstance(pack_format, str):
                     # Version name
+                    log(f'Looking up {self.__pack_type} pack format number for {pack_format} ...')
                     if looked_up := pack_format_of(pack_format, self.__pack_type):
                         # pack_format_of should take care of all error logging
                         self.pack_format(looked_up)
@@ -85,7 +112,21 @@ class Project(ABC):
             log(f'pack_format should be int or str, but is {type(pack_format)}', log_error)
 
 
-    def var(self, name: str) -> Any:
+    def var_set(self, name: str, value: Any):
+        """
+        Safely set a variable
+
+        :param name: The variable name. Must be a string!
+        :param value: Variable value
+        """
+
+        if isinstance(name, str):
+            self.__variables[name] = value
+        else:
+            log(f"Variable names can only be strings, but '{repr(name)}' is {type(name)}", log_error)
+
+
+    def var_get(self, name: str) -> Any:
         """
         Read a project variable. The given name is first looked up in the list
         of special variables ('project/version', 'project/pack_format',
@@ -98,7 +139,56 @@ class Project(ABC):
         if name in Project.__special_vars:
             return Project.__special_vars[name](self)
         else:
-            return self.variables.get(name, None)
+            return self.__variables.get(name, None)
+
+
+    def var_list(self) -> Iterable[str]:
+        """
+        Get a set of all variable names of the project
+        :return: A list containing all special variable names, followed by all custom variable names
+        """
+
+        return (list(Project.__special_vars.keys()) +
+                [varname for varname in self.__variables.keys() if varname not in Project.__special_vars])
+
+
+    def pack_files(self) -> Iterable[str]:
+        """
+        Get an iterator of all pack files. The file paths
+        are relative to the directory that the build script
+        is in.
+
+        :return: The iterator
+        """
+        return iter(self.__pack_files)
+
+
+    def include_files(self, pattern: str):
+        """
+        Include files in the file list of the core pack
+
+        :param pattern: A file path. Supports UNIX style globbing (e.g. './**/*.txt')
+        """
+
+        root_dir = path.realpath(f'{cfg.buildmc_root}/../')
+        self.__pack_files.extend([file for file
+                                  in glob(pattern, root_dir=root_dir, recursive=True,
+                                          include_hidden=True)
+                                  if path.realpath(file).startswith(root_dir)
+                                  and path.isfile(file) and file not in self.__pack_files
+                                  ])
+
+
+    def exclude_files(self, pattern: str):
+        """
+        Exclude files from the file list of the core pack
+
+        :param pattern: A file path. Supports UNIX style globbing (e.g. './**/*.txt')
+        """
+
+        excluded = glob(pattern, root_dir=f'{cfg.buildmc_root}/../',
+                        recursive=True, include_hidden=True)
+        self.__pack_files = [entry for entry in self.__pack_files if entry not in excluded]
 
 
     @abstractmethod

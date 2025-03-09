@@ -25,12 +25,24 @@ def cache_clean(name: str) -> bool:
 
     cache_path = f"{cfg.buildmc_root}/cache/{name}"
 
-    try:
-        shutil.rmtree(cache_path)
+    if not path.exists(cache_path):
         return True
-    except shutil.Error:
-        l.log(f"Unable to remove: '{cache_path}'", l.log_error)
-        return False
+    elif path.isfile(cache_path):
+        l.log(f"Cache '{cache_path}' should be a directory, but is a file! Removing...", l.log_warn)
+        try:
+            os.remove(cache_path)
+            return True
+        except FileNotFoundError:
+            l.log(f"Unable to remove '{cache_path}'!", l.log_error)
+            return False
+    else:
+        try:
+            shutil.rmtree(cache_path)
+            os.mkdir(cache_path)
+            return True
+        except shutil.Error:
+            l.log(f"Unable to remove: '{cache_path}'", l.log_error)
+            return False
 
 
 def cache_get(name: str, clean: bool) -> Optional[str]:

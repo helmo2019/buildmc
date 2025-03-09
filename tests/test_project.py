@@ -57,19 +57,22 @@ class ProjectTests(TestCase):
 
 class ProjectConfigTests(ProjectTests):
 
-    @classmethod
-    def test__1_project_init(cls):
-        cls.project.project()
-        cls.project.variables['my_variable'] = 123
-        cls.project.variables['project/version'] = 'Using var(), this string should never be visible'
+    def test__1_project_init(self):
+        project = ProjectConfigTests.project
+
+        project.project()
+        project.var_set('my_variable', 123)
+        project.var_set('project/version', 'Using var(), this string should never be visible')
+        project.var_set(123, 'This value should not get set!')
+        self.assertIsNone(project.var_get(123))
 
 
     def test__2_project_special_variables(self):
         project = ProjectConfigTests.project
-        project_version = project.var("project/version")
-        project_pack_format = project.var("project/pack_format")
-        project_pack_type = project.var("project/pack_type")
-        my_variable = project.var('my_variable')
+        project_version = project.var_get("project/version")
+        project_pack_format = project.var_get("project/pack_format")
+        project_pack_type = project.var_get("project/pack_type")
+        my_variable = project.var_get('my_variable')
 
         self.assertEqual(project_version, '1.0-DEBUG', 'Project version')
         self.assertEqual(project_pack_format, 61, 'Pack format of 1.21.4')

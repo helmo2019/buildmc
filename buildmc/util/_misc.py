@@ -4,7 +4,7 @@ import json
 import shutil
 from json.decoder import JSONDecodeError
 from os import path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional, Type
 
 
 def require_file(file_path: str, type_checker: Callable[[str], bool], generator: Callable[[str], None] = None) -> str:

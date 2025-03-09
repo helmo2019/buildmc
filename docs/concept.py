@@ -14,7 +14,7 @@ class Project(api.Project):
         self.pack_type("data")
         self.pack_format("1.21.4")
 
-        self.variables["some_var"] = "This can be inserted with %{some_var}!"
+        self.__variables["some_var"] = "This can be inserted with %{some_var}!"
 
         self.dependencies["modrinth_library"] = api.Dependency.Modrinth(self, version_id="abcd1234")
 
