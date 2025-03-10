@@ -10,7 +10,7 @@ class Project(api.Project):
     def project(self):
         """Set project meta & dependencies here. Invoked at the start of any task."""
 
-        self.project_version = "1.0"
+        self.project_version("1.0")
         self.pack_type("data")
         self.pack_format("1.21.4")
 
@@ -40,12 +40,12 @@ class Project(api.Project):
         # Variables can be inserted in processed documents
         self.platforms["modrinth"].variables["download_url"] = f"{self.platforms["modrinth"].project_url()}/versions"
 
-    def included_documents(self):
+    def included_files(self):
         """Define documents to include in the build. Invoked by the build task."""
 
-        self.documents["pack.mcmeta"] = api.Document.Processed("pack.mcmeta")
-        self.documents["license"] = api.Document.Copy("doc/License.txt")
-        self.documents["credits"] = api.Document.Copy("doc/Credits.txt")
+        self.files["pack.mcmeta"] = api.Document.Processed("pack.mcmeta")
+        self.files["license"] = api.Document.Copy("doc/License.txt")
+        self.files["credits"] = api.Document.Copy("doc/Credits.txt")
 
     def pack_overlays(self):
         """Define pack overlays for use with the patchtool. Invoked by patchtool."""

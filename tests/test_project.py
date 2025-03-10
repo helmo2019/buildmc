@@ -18,7 +18,7 @@ class TestProject(api.Project):
         pass
 
 
-    def included_documents(self):
+    def included_files(self):
         pass
 
 

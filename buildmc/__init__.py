@@ -36,6 +36,9 @@ def main(project_class: Type[api.Project]):
             case 'build':
                 util.log(f'Building project {project.var_get("project/name")} ...')
 
+                # Configure included files
+                project.included_files()
+
                 build_cache = util.cache_get('build', True)
                 core_pack_build_cache = util.cache_get('build/pack', False)
 
@@ -46,7 +49,7 @@ def main(project_class: Type[api.Project]):
                     destination = f'{directory_tree}/{path.basename(file)}'
 
                     # Create directories & copy file
-                    makedirs(directory_tree)
+                    makedirs(directory_tree, exist_ok=True)
                     copyfile(path.realpath(file), destination, follow_symlinks=True)
 
                 # Create ZIP

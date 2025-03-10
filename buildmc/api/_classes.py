@@ -6,7 +6,7 @@ from os import path
 from typing import Any, Callable, Iterable, Literal, Optional
 
 from buildmc import _config as cfg
-from buildmc.util import log, log_error, pack_format_of
+from buildmc.util import log, log_error, log_warn, pack_format_of
 
 
 class Project(ABC):
@@ -23,7 +23,7 @@ class Project(ABC):
     def __init__(self):
         self.dependencies: dict[str, Dependency] = { }
         self.platforms: dict[str, Platform] = { }
-        self.documents: dict[str, Document] = { }
+        self.files: dict[str, Document] = { }
         self.overlays: dict[str, Overlay] = { }
 
         self.__variables: dict[str, Any] = { }
@@ -163,20 +163,34 @@ class Project(ABC):
         return iter(self.__pack_files)
 
 
-    def include_files(self, pattern: str):
+    def include_files(self, pattern: str, destination: Optional[str] = None, do_glob: bool = True):
         """
         Include files in the file list of the core pack
 
-        :param pattern: A file path. Supports UNIX style globbing (e.g. './**/*.txt')
+        :param pattern: A file path / pattern
+        :param destination: Where to place the files inside the output
+        :param do_glob: Whether to enable UNIX style globbing (e.g. './**/*.txt')
         """
 
         root_dir = path.realpath(f'{cfg.buildmc_root}/../')
-        self.__pack_files.extend([file for file
-                                  in glob(pattern, root_dir=root_dir, recursive=True,
-                                          include_hidden=True)
-                                  if path.realpath(file).startswith(root_dir)
-                                  and path.isfile(file) and file not in self.__pack_files
-                                  ])
+        included = glob(pattern, root_dir=root_dir, recursive=True, include_hidden=True) if do_glob else [pattern]
+        common_base_path = path.commonpath(included)
+        for file in included:
+            final_path = path.realpath(file if destination is None
+                                       else f'{destination}/{file.removeprefix(common_base_path)}')
+            relative_final_path = path.relpath(final_path, root_dir)
+
+            print(f'attempting to include: {final_path}')
+
+            if not path.isfile(final_path):
+                continue
+
+            if not final_path.startswith(root_dir):
+                log(f"Including file which is outside of the project root: '{relative_final_path}'", log_warn)
+
+            if relative_final_path not in self.__pack_files:
+                print(f'including: {relative_final_path}')
+                self.__pack_files.append(relative_final_path)
 
 
     def exclude_files(self, pattern: str):
@@ -204,7 +218,7 @@ class Project(ABC):
 
 
     @abstractmethod
-    def included_documents(self):
+    def included_files(self):
         """Called by the "build" task. Defines (possibly processed) documents to include in the build."""
         pass
 
@@ -249,6 +263,26 @@ class Platform(ABC):
 
 class Document(ABC):
     """A possible processed document"""
+
+
+    @abstractmethod
+    def get_output_path(self) -> str:
+        """
+        Get the output file path, relative to
+        the output root
+
+        :return: The output file path
+        """
+        pass
+
+
+    @abstractmethod
+    def process(self):
+        """
+        Process the document and places the result at
+        self.get_output_path()
+        """
+        pass
 
 
     @abstractmethod
