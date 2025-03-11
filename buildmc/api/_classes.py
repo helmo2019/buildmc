@@ -1,12 +1,11 @@
 """API classes"""
 
 from abc import ABC, abstractmethod
-from glob import glob
-from os import path
+from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Optional
 
 from buildmc import _config as cfg
-from buildmc.util import log, log_error, log_warn, pack_format_of
+from buildmc.util import common_base_path, log, log_error, log_warn, pack_format_of
 
 
 class Project(ABC):
@@ -172,15 +171,14 @@ class Project(ABC):
         :param do_glob: Whether to enable UNIX style globbing (e.g. './**/*.txt')
         """
 
-        root_dir = path.realpath(f'{cfg.buildmc_root}/../')
-        included = glob(pattern, root_dir=root_dir, recursive=True, include_hidden=True) if do_glob else [pattern]
-        common_base_path = path.commonpath(included)
+        # TODO
+        root_dir = Path(cfg.buildmc_root).parent
+        included = [p for p in root_dir.rglob(pattern)] if do_glob else [Path(pattern)]
+        common_base = common_base_path(included)
         for file in included:
             final_path = path.realpath(file if destination is None
-                                       else f'{destination}/{file.removeprefix(common_base_path)}')
+                                       else path.join(destination, file.removeprefix(common_base_path) if len(included) != 1 else file))
             relative_final_path = path.relpath(final_path, root_dir)
-
-            print(f'attempting to include: {final_path}')
 
             if not path.isfile(final_path):
                 continue
@@ -189,7 +187,6 @@ class Project(ABC):
                 log(f"Including file which is outside of the project root: '{relative_final_path}'", log_warn)
 
             if relative_final_path not in self.__pack_files:
-                print(f'including: {relative_final_path}')
                 self.__pack_files.append(relative_final_path)
 
 

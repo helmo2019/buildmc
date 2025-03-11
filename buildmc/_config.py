@@ -3,6 +3,7 @@
 from typing import Optional
 
 buildmc_root: Optional[str] = None
+script_path: Optional[str] = None
 download_bytes_per_second: int = 0
 version_meta_index_url: str = ''
 

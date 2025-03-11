@@ -15,9 +15,10 @@ def main(project_class: Type[api.Project]):
 
     # Set root directory
     cfg.reset()
-    script_dir = path.dirname(path.realpath(argv[0]))
-    chdir(script_dir)
-    cfg.buildmc_root = f'{script_dir}/buildmc_root'
+
+    cfg.script_path = path.dirname(__file__)
+    cfg.buildmc_root = path.join(cfg.script_path, 'buildmc_root')
+    chdir(cfg.script_path)
 
     # Configure project
     project = project_class()

@@ -1,8 +1,9 @@
 #!/usr/bin/python3
-from sys import path
+from os import path
+from sys import path as module_path
 
-
-path.append('../buildmc')
+# Add buildmc to module path
+module_path.append(path.realpath(f'{path.dirname(__file__)}/../'))
 
 from buildmc import api, main
 
@@ -23,7 +24,8 @@ class Project(api.Project):
 
     def included_files(self):
         self.include_files('data/**')
-        self.include_files('../LICENSE', destination="", do_glob=False)
+        self.include_files('../LICENSE', destination="somefile")
+        print(list(self.pack_files()))
 
 
     def pack_overlays(self):

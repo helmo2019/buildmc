@@ -3,8 +3,8 @@
 import json
 import shutil
 from json.decoder import JSONDecodeError
-from os import path
-from typing import Any, Callable, Optional, Type
+from pathlib import Path
+from typing import Any, Callable, Iterable, Optional, Type
 
 
 def require_file(file_path: str, type_checker: Callable[[str], bool], generator: Callable[[str], None] = None) -> str:
@@ -61,3 +61,14 @@ def get_json_string(json_data: str) -> Optional[dict]:
         return json.loads(json_data)
     except json.JSONDecodeError:
         return None
+
+
+def common_base_path(paths: list[Path]) -> Optional[Path]:
+    if len(paths) <= 1:
+        return None
+
+    common = paths[0].parent
+    for path in paths[1:]:
+        while common not in path.parents and common != path:
+            common = path.parent
+    return common
