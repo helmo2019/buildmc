@@ -2,7 +2,8 @@
 from os import path
 from sys import path as module_path
 
-# Add buildmc to module path
+# Add buildmc to module path. For development purposes only,
+# will be removed when I set up proper packaging.
 module_path.append(path.realpath(f'{path.dirname(__file__)}/../'))
 
 from buildmc import api, main
@@ -23,13 +24,12 @@ class Project(api.Project):
 
 
     def included_files(self):
-        self.include_files('data/**')
-        self.include_files('../LICENSE', destination="somefile")
-        print(list(self.pack_files()))
+        self.include_files('data/**/*')
+        self.include_files('../LICENSE', destination="documents")
 
 
     def pack_overlays(self):
         pass
 
 
-main(Project)
+main(Project, __file__)

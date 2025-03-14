@@ -28,4 +28,4 @@ def log(msg: str, level: int = log_info, flush: bool = False):
         f"{_f['yellow']}⚠" if level == log_warn else
         f"{_f['red']}{_f['b']}⮾{_f['n']}")
         +f" {msg}{_f['r']}"
-    , file=stderr if level > log_info else stdout, flush=flush)
+    , file=stderr if level > log_info else stdout, flush=(flush or level > log_info))

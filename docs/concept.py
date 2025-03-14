@@ -31,14 +31,14 @@ class Project(api.Project):
         # Codeberg releases page
         self.platforms["codeberg"] = api.Platform.CodebergReleases(url="https://codeberg.org/username/repo")
         self.platforms["codeberg"].changelog = Project.readme
-        self.platforms["codeberg"].variables["download_url"] = f"{self.platforms["codeberg"].project_url()}/releases"
+        self.platforms["codeberg"].variables["download_url"] = f"{self.platforms['codeberg'].project_url()}/releases"
 
         # Modrinth
         # 'url=...' is also possible, but 'id=' is preferred
         self.platforms["modrinth"] = api.Platform.Modrinth(project_id="1kjsfw82",
                                                            readme=Project.readme,changelog=Project.changelog)
         # Variables can be inserted in processed documents
-        self.platforms["modrinth"].variables["download_url"] = f"{self.platforms["modrinth"].project_url()}/versions"
+        self.platforms["modrinth"].variables["download_url"] = f"{self.platforms['modrinth'].project_url()}/versions"
 
     def included_files(self):
         """Define documents to include in the build. Invoked by the build task."""

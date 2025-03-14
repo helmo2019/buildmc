@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Optional
 
 from buildmc import _config as cfg
-from buildmc.util import common_base_path, log, log_error, log_warn, pack_format_of
+from buildmc.util import log, log_error, log_warn, pack_format_of
 
 
 class Project(ABC):
@@ -31,7 +31,7 @@ class Project(ABC):
         self.__pack_format: Optional[int] = None
         self.__pack_type: Optional[Literal['data', 'resource']] = None
         # Files to be included in the pack build. Relative to <root dir>/../
-        self.__pack_files: list[str] = []
+        self.__pack_files: list[tuple[Path, Path]] = []
 
 
     def project_version(self, project_version: str):
@@ -151,55 +151,75 @@ class Project(ABC):
                 [varname for varname in self.__variables.keys() if varname not in Project.__special_vars])
 
 
-    def pack_files(self) -> Iterable[str]:
+    def pack_files(self) -> Iterable[tuple[Path, Path]]:
         """
-        Get an iterator of all pack files. The file paths
-        are relative to the directory that the build script
-        is in.
+        Get an iterator of all pack files. The returned iterable
+        contains tuples with two element each: The first element
+        is the absolute source file path, and the second element
+        is the destination file path, which is relative to the
+        build cache directory 'buildmc_root/cache/build/pack'.
 
         :return: The iterator
         """
         return iter(self.__pack_files)
 
 
-    def include_files(self, pattern: str, destination: Optional[str] = None, do_glob: bool = True):
+    def include_files(self, pattern: str, destination: Optional[str | Path] = None, do_glob: bool = True):
         """
-        Include files in the file list of the core pack
+        Include files in the file list of the core pack. If
 
         :param pattern: A file path / pattern
         :param destination: Where to place the files inside the output
         :param do_glob: Whether to enable UNIX style globbing (e.g. './**/*.txt')
         """
 
-        # TODO
-        root_dir = Path(cfg.buildmc_root).parent
-        included = [p for p in root_dir.rglob(pattern)] if do_glob else [Path(pattern)]
-        common_base = common_base_path(included)
-        for file in included:
-            final_path = path.realpath(file if destination is None
-                                       else path.join(destination, file.removeprefix(common_base_path) if len(included) != 1 else file))
-            relative_final_path = path.relpath(final_path, root_dir)
+        included = list(cfg.script_directory.rglob(pattern)) if do_glob else [Path(pattern)]
 
-            if not path.isfile(final_path):
+        for file in [file.resolve() for file in included]:
+            # Only include files, not directories;
+            # And do not include files from buildmc_root
+            if not file.is_file() or (cfg.buildmc_root in file.parents):
                 continue
 
-            if not final_path.startswith(root_dir):
-                log(f"Including file which is outside of the project root: '{relative_final_path}'", log_warn)
+            # Make sure the file exists
+            if not file.exists():
+                log(f"Attempted to include non-existent file '{file}'", log_warn)
+                continue
 
-            if relative_final_path not in self.__pack_files:
-                self.__pack_files.append(relative_final_path)
+            # Set destination correctly
+            if destination is None:
+                if cfg.script_directory in file.parents:
+                    # File is inside the script's directory
+                    destination_path = file.relative_to(cfg.script_directory)
+                else:
+                    # File is outside the script's directory
+                    log(f"Including file which is outside of the project root: '{file.name}'", log_warn)
+                    destination_path = Path(file.name)
+            else:
+                # Print error if outside root
+                if cfg.script_directory not in file.parents:
+                    log(f"Including file which is outside of the project root: '{file.name}'", log_warn)
+
+                # Manually set destination
+                destination_path = Path(destination) / file.name
+
+            data_set = (file, destination_path)
+            if data_set not in self.__pack_files:
+                self.__pack_files.append(data_set)
 
 
-    def exclude_files(self, pattern: str):
+    def exclude_files(self, pattern: str, *, by_destination: bool = False):
         """
         Exclude files from the file list of the core pack
 
         :param pattern: A file path. Supports UNIX style globbing (e.g. './**/*.txt')
+        :param by_destination: Whether to remove pack file entries whose destination paths matches the pattern
         """
 
-        excluded = glob(pattern, root_dir=f'{cfg.buildmc_root}/../',
-                        recursive=True, include_hidden=True)
-        self.__pack_files = [entry for entry in self.__pack_files if entry not in excluded]
+        excluded = list(cfg.script_directory.rglob(pattern))
+        self.__pack_files = [entry for entry in self.__pack_files if ((by_destination and entry[1] not in excluded)
+                                                                      or (not by_destination and entry[
+                    0] not in excluded))]
 
 
     @abstractmethod

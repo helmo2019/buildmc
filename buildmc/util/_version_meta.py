@@ -1,7 +1,7 @@
 """Version meta querying"""
 
 import os
-from os import path
+from pathlib import Path
 
 from . import _cache as c, _logging as l, _misc as m, log_error
 from .. import _config as cfg, meta_extractor
@@ -18,9 +18,9 @@ def pack_format_of(version_name: str, format_type: str) -> int | None:
     """
 
     # Get cache dir
-    cache_dir = c.cache_get('meta_extractor', False)
-    version_meta_json = m.require_file(f'{cache_dir}/version_meta.json', path.isfile)
-    pack_formats_json = m.require_file(f'{cache_dir}/pack_formats.json', path.isfile)
+    cache_dir = c.cache_get(Path('meta_extractor'), False)
+    version_meta_json = m.require_file(cache_dir / 'version_meta.json', lambda p: p.is_file())
+    pack_formats_json = m.require_file(cache_dir / 'pack_formats.json', lambda p: p.is_file())
     real_version_name = meta_extractor.real_version_name(version_name)
 
     # Check if the version data is in pack_formats.json
@@ -34,7 +34,7 @@ def pack_format_of(version_name: str, format_type: str) -> int | None:
 
         # Version name is now inside of version_meta.json
         # -> Run the Metadata Transformer to update pack_formats.json
-        meta_extractor.transformer(['--unwrap', version_meta_json, 'version', 'pack_version', pack_formats_json])
+        meta_extractor.transformer(['--unwrap', str(version_meta_json), 'version', 'pack_version', str(pack_formats_json)])
 
     # Extract data from pack_formats.json
     pack_formats_data = m.get_json(pack_formats_json)
@@ -57,7 +57,7 @@ def pack_format_of(version_name: str, format_type: str) -> int | None:
             return version_meta
 
 
-def _update_version_meta_index(file_path: str, version_name: str) -> bool:
+def _update_version_meta_index(file_path: Path, version_name: str) -> bool:
     """
     Try to update the cached version_meta.json file
 
@@ -105,8 +105,7 @@ def _update_version_meta_index(file_path: str, version_name: str) -> bool:
     elif version_name not in json_data:
         l.log(
                 f"Unable to obtain version meta for '{version_name}'. Is it spelled correctly? Is it listed in "
-                f"Mojang's "
-                f"version manifest?", log_error)
+                f"Mojang's version manifest?", log_error)
         return False
     else:
         # If we've made it here, we can now, *at last*, report that we've updated the version metadata index

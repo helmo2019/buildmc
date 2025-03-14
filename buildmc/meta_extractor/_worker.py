@@ -38,7 +38,7 @@ class WorkerProcess:
 
                 # Check if we can find version.json in server.jar
                 if datetime.fromisoformat(version_info['releaseTime']) < WorkerProcess.__snapshot_18w47b_release:
-                    log(f"Skipping version '{version_info['id']}' as it does not contain version.json", log_warn, flush=True)
+                    log(f"Skipping version '{version_info['id']}' as it does not contain version.json", log_warn)
                     continue
 
                 # Get download URL
