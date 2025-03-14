@@ -4,10 +4,10 @@ import json
 import shutil
 from json.decoder import JSONDecodeError
 from pathlib import Path
+from sys import stderr, stdout
 from typing import Callable, Optional
 
-from buildmc import _config as cfg
-from ._logging import log, log_error
+from buildmc import _config as cfg, ansi
 
 
 def require_file(file_path: Path, type_checker: Callable[[Path], bool], *, generator: Callable[[Path], None] = None) \
@@ -94,3 +94,22 @@ def get_json_string(json_data: str) -> Optional[dict]:
         return json.loads(json_data)
     except json.JSONDecodeError:
         return None
+
+
+# Logging
+
+log_info = 0
+log_heading = 1
+log_warn = 10
+log_error = 11
+
+def log(msg: str, level: int = log_info, flush: bool = False):
+    """Print styled log message to appropriate output stream"""
+
+    print(
+            (f" {ansi.bold}{ansi.green}ℹ{ansi.reset}" if level == log_info else
+             f"{ansi.bold}{ansi.blue}==⇒{ansi.reset}{ansi.bold}" if level == log_heading else
+             f" {ansi.yellow}⚠" if level == log_warn else
+             f" {ansi.red}{ansi.bold}⮾{ansi.not_bold}")
+            + f" {msg}{ansi.reset}"
+            , file=stderr if level >= log_warn else stdout, flush=(flush or level >= log_warn))

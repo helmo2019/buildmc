@@ -1,11 +1,137 @@
 """API classes"""
 
+import shutil
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Optional
 
+import buildmc.ansi
 from buildmc import _config as cfg
 from buildmc.util import log, log_error, log_warn, pack_format_of
+
+
+@dataclass
+class ProjectFile:
+    source: Path
+    destination: Path
+    process: bool = False
+
+
+    def __process_and_copy(self, build_directory: Path, project: Optional['Project']):
+        """
+        Process the file: Substitute any '%{variable_name}'
+        with the value of 'variable_name'. Expects the destination
+        directory to exist.
+
+        :param project: The project to take variable values from
+        """
+
+        with self.source.open('r') as source_file, (build_directory / self.destination).open('w') as destination_file:
+            # Define operations
+            buffer = ""
+
+
+            def peek(characters: int = 1) -> str:
+                """Read the next character(s) without advancing the file pointer"""
+
+                current_position = source_file.tell()
+                next_char = source_file.read(characters)
+                source_file.seek(current_position)
+                return next_char
+
+
+            def consume(characters: int = 1):
+                """Discard the next character"""
+
+                source_file.read(characters)
+
+
+            def pop():
+                """Read the next character into the buffer"""
+
+                nonlocal buffer
+                buffer += source_file.read(1)
+
+
+            def push():
+                """Write the buffer into the destination file and empty it"""
+
+                nonlocal buffer
+                destination_file.write(buffer)
+                buffer = ""
+
+
+            while True:  # The loop is broken at appropriate points when end-of-file is reached
+                # While there is no begin of a variable substitution, simply read into the buffer
+                while peek(2) != '%{' and peek():
+                    pop()
+
+                # Push the buffer when we reach an opening '%{' / end-of-file
+                push()
+
+                # Break if we've reached end-of-file
+                if not peek():
+                    break
+
+                # Discard the '%{'
+                consume(2)
+
+                # Read the variable name into the buffer until we hit a '}' or end-of-file
+                while peek() != '}' and peek():
+                    pop()
+
+                # Reached end-of-file while looking for closing '}'
+                if not peek():
+                    log(f"While processing '{self.source}': Reached end-of-file while looking for closing '}}' for"
+                        f" '{buildmc.ansi.gray}%{{{buffer[:10]}{buildmc.ansi.reset} ...'", log_error)
+                    project.fail()
+                    break
+
+                # Look up variable value
+                if buffer not in project.var_list():
+                    log(f"While processing '{self.destination}': Unresolved variable reference '{buffer}'", log_warn)
+
+                buffer = str(project.var_get(buffer))
+                push()
+
+                # Discard the closing '}'
+                consume()
+
+
+    def copy(self, build_directory: Path, project: Optional['Project'] = None):
+        """
+        Process the file, if required, and copy it to the destination.
+
+        :param build_directory: The pack build directory
+        :param project: The project to take variables from when processing
+        """
+
+        if project.has_failed():
+            return
+
+        # Get paths
+        directory_tree = build_directory / self.destination.parent
+        destination = directory_tree / self.destination.name
+
+        # Create directories & copy file
+        directory_tree.mkdir(parents=True, exist_ok=True)
+
+        if self.process:
+            self.__process_and_copy(build_directory, project)
+        else:
+            try:
+                shutil.copyfile(self.source, destination)
+            except shutil.Error:
+                project.fail()
+
+
+    def __eq__(self, __value):
+        if isinstance(__value, ProjectFile):
+            return (self.source.resolve() == __value.source.resolve()
+                    and self.destination.resolve() == __value.destination.resolve())
+        else:
+            return False
 
 
 class Project(ABC):
@@ -22,7 +148,7 @@ class Project(ABC):
     def __init__(self):
         self.dependencies: dict[str, Dependency] = { }
         self.platforms: dict[str, Platform] = { }
-        self.files: dict[str, Document] = { }
+        self.files: dict[str, ProjectFile] = { }
         self.overlays: dict[str, Overlay] = { }
 
         self.__variables: dict[str, Any] = { }
@@ -31,7 +157,8 @@ class Project(ABC):
         self.__pack_format: Optional[int] = None
         self.__pack_type: Optional[Literal['data', 'resource']] = None
         # Files to be included in the pack build. Relative to <root dir>/../
-        self.__pack_files: list[tuple[Path, Path]] = []
+        self.__pack_files: list[ProjectFile] = []
+        self.__successful: bool = True
 
 
     def project_version(self, project_version: str):
@@ -151,7 +278,7 @@ class Project(ABC):
                 [varname for varname in self.__variables.keys() if varname not in Project.__special_vars])
 
 
-    def pack_files(self) -> Iterable[tuple[Path, Path]]:
+    def pack_files(self) -> Iterable[ProjectFile]:
         """
         Get an iterator of all pack files. The returned iterable
         contains tuples with two element each: The first element
@@ -164,26 +291,34 @@ class Project(ABC):
         return iter(self.__pack_files)
 
 
-    def include_files(self, pattern: str, destination: Optional[str | Path] = None, do_glob: bool = True):
+    def include_files(self, pattern: str, *, process: bool = False, destination: Optional[str | Path] = None,
+                      do_glob: bool = True):
         """
         Include files in the file list of the core pack. If
 
         :param pattern: A file path / pattern
+        :param process: Whether variable substitution should be performed for the file
         :param destination: Where to place the files inside the output
         :param do_glob: Whether to enable UNIX style globbing (e.g. './**/*.txt')
         """
 
         included = list(cfg.script_directory.rglob(pattern)) if do_glob else [Path(pattern)]
 
+        if len(included) == 0:
+            log(f"No file matched the pattern '{pattern}'", log_error)
+            self.fail()
+            return
+
         for file in [file.resolve() for file in included]:
+            # Make sure the file exists
+            if not file.exists():
+                log(f"File not found: '{file}'", log_error)
+                self.fail()
+                return
+
             # Only include files, not directories;
             # And do not include files from buildmc_root
             if not file.is_file() or (cfg.buildmc_root in file.parents):
-                continue
-
-            # Make sure the file exists
-            if not file.exists():
-                log(f"Attempted to include non-existent file '{file}'", log_warn)
                 continue
 
             # Set destination correctly
@@ -193,19 +328,23 @@ class Project(ABC):
                     destination_path = file.relative_to(cfg.script_directory)
                 else:
                     # File is outside the script's directory
-                    log(f"Including file which is outside of the project root: '{file.name}'", log_warn)
+                    log(f"Including file which is outside of the project root: '{file.resolve()}'", log_warn)
                     destination_path = Path(file.name)
             else:
                 # Print error if outside root
                 if cfg.script_directory not in file.parents:
-                    log(f"Including file which is outside of the project root: '{file.name}'", log_warn)
+                    log(f"Including file which is outside of the project root: '{file.resolve()}'", log_warn)
 
                 # Manually set destination
                 destination_path = Path(destination) / file.name
 
-            data_set = (file, destination_path)
-            if data_set not in self.__pack_files:
-                self.__pack_files.append(data_set)
+            project_file = ProjectFile(file, destination_path, process)
+
+            # If the file is already included, remove it first
+            if project_file in self.__pack_files:
+                self.__pack_files.remove(project_file)
+
+            self.__pack_files.append(project_file)
 
 
     def exclude_files(self, pattern: str, *, by_destination: bool = False):
@@ -216,10 +355,26 @@ class Project(ABC):
         :param by_destination: Whether to remove pack file entries whose destination paths matches the pattern
         """
 
-        excluded = list(cfg.script_directory.rglob(pattern))
-        self.__pack_files = [entry for entry in self.__pack_files if ((by_destination and entry[1] not in excluded)
-                                                                      or (not by_destination and entry[
-                    0] not in excluded))]
+        excluded = [(file if by_destination else file.resolve()) for file in cfg.script_directory.rglob(pattern)]
+        self.__pack_files = [entry for entry in self.__pack_files if
+                             ((by_destination and entry.destination not in excluded)
+                              or (not by_destination and entry.source not in excluded))]
+
+
+    def fail(self):
+        """Mark this project's build as failed"""
+
+        self.__successful = False
+
+
+    def has_failed(self) -> bool:
+        """
+        Check whether this project's build is successful so far
+
+        :return: Whether the build is successful so far
+        """
+
+        return not self.__successful
 
 
     @abstractmethod
@@ -276,35 +431,6 @@ class Platform(ABC):
 
     def __init__(self):
         self.variables: dict[str, Any] = { }
-
-
-class Document(ABC):
-    """A possible processed document"""
-
-
-    @abstractmethod
-    def get_output_path(self) -> str:
-        """
-        Get the output file path, relative to
-        the output root
-
-        :return: The output file path
-        """
-        pass
-
-
-    @abstractmethod
-    def process(self):
-        """
-        Process the document and places the result at
-        self.get_output_path()
-        """
-        pass
-
-
-    @abstractmethod
-    def __init__(self):
-        pass
 
 
 class Overlay(ABC):

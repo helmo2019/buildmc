@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-from . import _logging as l, _misc as m
+from . import _misc as m
 from .. import _config as cfg
 
 
@@ -34,7 +34,8 @@ def cache_clean(name: Path) -> bool:
         return True
     elif cache_path.is_file():
         # Caches should be directories, but we'll ask no questions and clean up anyway
-        l.log(f"Cache '{cache_path}' should be a directory, but is a file! Removing...", l.log_warn)
+        m.log(f"Cache '{cache_path}' should be a directory, but is a file! Removing...",
+                               m.log_warn)
         cache_path.unlink()
         return True
     else:
@@ -45,12 +46,12 @@ def cache_clean(name: Path) -> bool:
             # Re-create the cache as an empty directory
             cache_path.mkdir()
 
-            l.log(f"Cleaned cache '{cache_path.relative_to(cfg.buildmc_root / 'cache')}'")
+            m.log(f"Cleaned cache '{cache_path.relative_to(cfg.buildmc_root / 'cache')}'")
 
             return True
         except shutil.Error:
             # Catch errors
-            l.log(f"Unable to remove: '{cache_path}'", l.log_error)
+            m.log(f"Unable to remove: '{cache_path}'", m.log_error)
             return False
 
 
@@ -72,7 +73,8 @@ def cache_get(name: Path, clean: bool) -> Optional[Path]:
     # Handle existing non-directory
     elif dir_path.exists():
         if not dir_path.is_dir():
-            l.log(f"Attempted to use cache subdirectory '{dir_path}', but it's a file! Removing...", l.log_error)
+            m.log(f"Attempted to use cache subdirectory '{dir_path}', but it's a file! Removing...",
+                                   m.log_error)
             if not cache_clean(name):
                 return None
 

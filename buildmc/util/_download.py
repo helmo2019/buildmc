@@ -8,7 +8,7 @@ from typing import Optional
 
 import requests
 
-from . import _logging as l
+from . import _misc as m
 
 
 def download(fp, url: str, rate_limit: int = -1, retries: int = 3, sha1_sum: Optional[str] = None) -> bool:
@@ -64,11 +64,11 @@ def download(fp, url: str, rate_limit: int = -1, retries: int = 3, sha1_sum: Opt
             # Return True if the download was successful
             return True
         except requests.HTTPError as e:
-            l.log(f"HTTP error occurred for '{url}': {e}", l.log_warn)
+            m.log(f"HTTP error occurred for '{url}': {e}", m.log_warn)
         except ChecksumMismatchError:
-            l.log(f"SHA1 mismatch for download of '{url}'", l.log_warn)
+            m.log(f"SHA1 mismatch for download of '{url}'", m.log_warn)
 
-    l.log(f"Download of '{url}' failed after {retries} attempts", l.log_error)
+    m.log(f"Download of '{url}' failed after {retries} attempts", m.log_error)
     return False
 
 

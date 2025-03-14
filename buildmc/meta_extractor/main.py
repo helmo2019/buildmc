@@ -1,6 +1,7 @@
 from argparse import Namespace
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from json import dump as json_write
+from pathlib import Path
 from re import fullmatch
 from sys import argv
 
@@ -81,7 +82,7 @@ def main(args: list[str] | dict | None):
 
         # Load / create results dictionary
         if config.options.merge:
-            if json_data := get_json(config.options.output):
+            if json_data := get_json(Path(config.options.output)):
                 config.version_meta = json_data
             else:
                 config.version_meta = { }

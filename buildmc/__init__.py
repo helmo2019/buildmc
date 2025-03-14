@@ -1,19 +1,16 @@
 from os import chdir
 from os.path import basename
 from pathlib import Path
-from shutil import copyfile
 from sys import argv, exit
 from typing import Type
 from zipfile import ZipFile
 
-from buildmc import _config as cfg, api, util
+from buildmc import _config as cfg, api, util, ansi
 
-
-_faint = '\033[2m'
-_gray = '\033[38;2;150;150;150m'
-_reset = '\033[0m'
 
 _valid_tasks = ('help', 'clean', 'variables', 'files', 'build')
+_configure_project_message = 'Configuring project'
+_configure_files_message = 'Configuring files'
 
 
 def main(project_class: Type[api.Project], build_script_file_name: str):
@@ -44,11 +41,11 @@ def main(project_class: Type[api.Project], build_script_file_name: str):
     }
 
 
-    def ensure_state(name: str, function):
+    def ensure_state(name: str, function, message):
         if not project_state[name]:
+            util.log(message, util.log_heading)
             function()
             project_state[name] = True
-
 
     def show_help():
         """Print help and exit"""
@@ -73,60 +70,70 @@ def main(project_class: Type[api.Project], build_script_file_name: str):
         show_help()
 
     for command in argv[1:]:
+        if project.has_failed():
+            break
+
         match command:
             case 'clean':
                 # Clean all caches
+                util.log('Cleaning caches', util.log_heading)
                 util.cache_clean_all()
             case 'variables':
                 # Print project variables
 
-                ensure_state('project_configured', project.project)
+                ensure_state('project_configured', project.project, _configure_project_message)
 
-                util.log('Project variables:' + (''.join(
-                        [f"\n  {_gray}'{var_name}'{_reset} = {repr(project.var_get(var_name))}"
+                util.log(f'Project variables:{ansi.reset}' + (''.join(
+                        [f"\n  {ansi.gray}'{var_name}'{ansi.reset} = {repr(project.var_get(var_name))}"
                          for var_name in project.var_list()]
-                )))
+                )), util.log_heading)
             case 'files':
                 # Print included files
 
-                ensure_state('project_configured', project.project)
-                ensure_state('files_configured', project.included_files)
+                ensure_state('files_configured', project.included_files, _configure_files_message)
 
-                util.log('Project files: ' + (''.join(
-                        [f"\n  {_gray}'{project_file[0]}'{_reset}\n   → '{project_file[1]}'"
+                util.log(f'Project files:{ansi.reset}' + (''.join(
+                        [f"\n  {ansi.gray}'{project_file.source}'{ansi.reset}\n   → "
+                         f"'{project_file.destination}'"
+                         f"{f'{ansi.purple} (processed){ansi.reset}' if project_file.process else ''}"
                          for project_file in project.pack_files()]
-                )))
+                )), util.log_heading)
             case 'build':
                 # Assemble the included files into a ZIP
 
-                ensure_state('project_configured', project.project)
-                ensure_state('files_configured', project.included_files)
-
-                util.log(f'Building project {project.var_get("project/name")} ...')
-
                 # Configure included files
-                ensure_state('project_configured', project.project)
-                ensure_state('files_configured', project.included_files)
+                ensure_state('project_configured', project.project, _configure_project_message)
+                ensure_state('files_configured', project.included_files, _configure_files_message)
 
-                build_cache = util.cache_get(Path('build'), True)
-                core_pack_build_cache = util.cache_get(Path('build', 'pack'), False)
+                if not project.has_failed():
+                    util.log(f'Building project {project.var_get("project/name")}', util.log_heading)
 
-                # Copy files
-                for file in project.pack_files():
-                    # Get paths
-                    directory_tree = core_pack_build_cache / file[1].parent
-                    destination = directory_tree / file[1].name
+                    build_cache = util.cache_get(Path('build'), True)
+                    core_pack_build_cache = util.cache_get(Path('build', 'pack'), False)
 
-                    # Create directories & copy file
-                    directory_tree.mkdir(parents=True, exist_ok=True)
-                    copyfile(file[0], destination, follow_symlinks=True)
+                    # Copy files
+                    util.log('Copying & processing included files')
 
-                # Create ZIP
-                zip_file_path = (f'{build_cache}/{project.var_get("project/name")}'
-                                 f'-{project.var_get("project/version")}.zip')
+                    for file in project.pack_files():
+                        file.copy(core_pack_build_cache, project)
 
-                with ZipFile(zip_file_path, 'w') as zip_file:
-                    for pack_file in project.pack_files():
-                        zip_file.write(core_pack_build_cache / pack_file[1], arcname=str(pack_file[1]))
+                    if not project.has_failed():
+                        # Create ZIP
+                        util.log('Assembling ZIP file')
+
+                        zip_file_path = build_cache / (f'{project.var_get("project/name")}'
+                                                       f'-{project.var_get("project/version")}.zip')
+
+                        with ZipFile(zip_file_path, 'w') as zip_file:
+                            for pack_file in project.pack_files():
+                                zip_file.write(core_pack_build_cache / pack_file.destination,
+                                               arcname=str(pack_file.destination))
             case _:
                 show_help()
+
+    # Show end result
+    if project.has_failed():
+        print(f'\n{ansi.red}{ansi.bold}[✘]{ansi.not_bold} Project build failed')
+        exit(1)
+    else:
+        print(f'\n{ansi.green}{ansi.bold}[✔]{ansi.not_bold} Project build successful')

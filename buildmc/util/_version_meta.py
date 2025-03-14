@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from . import _cache as c, _logging as l, _misc as m, log_error
+from . import _cache as c, _misc as m, log_error
 from .. import _config as cfg, meta_extractor
 from ..util import download
 
@@ -41,7 +41,7 @@ def pack_format_of(version_name: str, format_type: str) -> int | None:
     # Check if file exists & is valid JSON
     if pack_formats_data is None:
         # If not, log error and return None
-        l.log(f"Unable to query {format_type} pack format for version '{version_name}'"
+        m.log(f"Unable to query {format_type} pack format for version '{version_name}'"
               f"from '{pack_formats_json}', l.log_error)")
         return None
     else:
@@ -99,11 +99,11 @@ def _update_version_meta_index(file_path: Path, version_name: str) -> bool:
     # First, let's check if the JSON is valid
     json_data = m.get_json(file_path)
     if json_data is None:
-        l.log('Unable to obtain usable version meta data index', l.log_error)
+        m.log('Unable to obtain usable version meta data index', m.log_error)
         return False
     # Now, let's see if the version is (finally) inside the index
     elif version_name not in json_data:
-        l.log(
+        m.log(
                 f"Unable to obtain version meta for '{version_name}'. Is it spelled correctly? Is it listed in "
                 f"Mojang's version manifest?", log_error)
         return False

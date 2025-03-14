@@ -4,8 +4,8 @@ from buildmc import api
 class Project(api.Project):
 
     # Put any variables here...
-    readme = api.Document.Processed("doc/README.md")
-    changelog = api.Document.Processed("doc/CHANGELOG.md")
+    readme = api.ProjectFile.Processed("doc/README.md")
+    changelog = api.ProjectFile.Processed("doc/CHANGELOG.md")
 
     def project(self):
         """Set project meta & dependencies here. Invoked at the start of any task."""
@@ -43,9 +43,9 @@ class Project(api.Project):
     def included_files(self):
         """Define documents to include in the build. Invoked by the build task."""
 
-        self.files["pack.mcmeta"] = api.Document.Processed("pack.mcmeta")
-        self.files["license"] = api.Document.Copy("doc/License.txt")
-        self.files["credits"] = api.Document.Copy("doc/Credits.txt")
+        self.files["pack.mcmeta"] = api.ProjectFile.Processed("pack.mcmeta")
+        self.files["license"] = api.ProjectFile.Copy("doc/License.txt")
+        self.files["credits"] = api.ProjectFile.Copy("doc/Credits.txt")
 
     def pack_overlays(self):
         """Define pack overlays for use with the patchtool. Invoked by patchtool."""

@@ -25,6 +25,7 @@ class Project(api.Project):
 
     def included_files(self):
         self.include_files('data/**/*')
+        self.include_files('readme.md', process=True, do_glob=False)
         self.include_files('../LICENSE', destination="documents")
 
 
