@@ -24,9 +24,10 @@ class Project(api.Project):
 
 
     def included_files(self):
-        self.include_files('data/**/*')
-        self.include_files('readme.md', process=True, do_glob=False)
-        self.include_files('../LICENSE', destination="documents")
+        self.include_files('data/**/*', glob=True)
+        self.include_files('readme.md', process=True, destination='documents')
+        self.include_files('../LICENSE', destination='documents')
+        self.include_files('pack.mcmeta', process=True)
 
 
     def pack_overlays(self):

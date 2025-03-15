@@ -1,0 +1,16 @@
+{
+    "pack": {
+        "description": [
+            {
+                "text": "%{project/name}\n",
+                "extra": [],
+                "color": "aqua"
+            },
+            {
+                "text": "%{project/version}",
+                "color": "gold"
+            }
+        ],
+        "pack_format": %{project/pack_format}
+    }
+}

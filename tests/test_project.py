@@ -2,11 +2,12 @@ import shutil
 from os import path
 from unittest import TestCase
 
+import buildmc.api._project
 from buildmc import _config as cfg, api
 from buildmc.util import log
 
 
-class TestProject(api.Project):
+class TestProject(buildmc.api._project.Project):
 
     def project(self):
         self.project_version = '1.0-DEBUG'
@@ -39,7 +40,7 @@ class ProjectTests(TestCase):
         if ProjectTests.clean_up_before and path.isdir(cfg.buildmc_root):
             shutil.rmtree(cfg.buildmc_root)
 
-        cls.project: api.Project = TestProject()
+        cls.project: buildmc.api._project.Project = TestProject()
 
 
     @classmethod

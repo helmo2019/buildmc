@@ -5,7 +5,7 @@
    - [x] Cache file system
 2. Building the pack
    - [x] Including files & assembling ZIP file
-   - [ ] **Document processing system**
+   - [x] **Document processing system**
 3. Dependency management
    - [ ] Integration with [weld](https://docs.smithed.dev/weld/) for building
      packs with all dependencies included
@@ -13,6 +13,7 @@
      or raw **URLs to ZIP files**
    - [ ] Option for whether the dependency should be bundled or not
 4. Publishing of builds
+   - [ ] Local
    - [ ] Modrinth
    - [ ] Codeberg Releases (or any other Forgejo instance)
    - [ ] Maybe other Git hosting services that have a *Releases* feature (GitHub, GitLab)

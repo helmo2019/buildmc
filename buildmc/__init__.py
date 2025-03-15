@@ -5,7 +5,7 @@ from sys import argv, exit
 from typing import Type
 from zipfile import ZipFile
 
-from buildmc import _config as cfg, api, util, ansi
+from buildmc import _config as cfg, ansi, api, util
 
 
 _valid_tasks = ('help', 'clean', 'variables', 'files', 'build')
@@ -25,7 +25,7 @@ def main(project_class: Type[api.Project], build_script_file_name: str):
     cfg.reset()
 
     cfg.script_directory = Path(build_script_file_name).parent
-    cfg.buildmc_root = cfg.script_directory / 'buildmc_root'
+    cfg.buildmc_root = cfg.script_directory / '.buildmc'
     chdir(str(cfg.script_directory.resolve()))
 
     # Configure project
@@ -46,6 +46,7 @@ def main(project_class: Type[api.Project], build_script_file_name: str):
             util.log(message, util.log_heading)
             function()
             project_state[name] = True
+
 
     def show_help():
         """Print help and exit"""
