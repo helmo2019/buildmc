@@ -1,3 +1,5 @@
+from typing import LiteralString
+
 # BuildMC Documentation
 
 The `buildmc.api` module is hereby referred to as `api`.  
@@ -47,7 +49,7 @@ Available tasks are:
 ## Build Script
 
 The build script is simply a regular Python 3 script that uses
-the BuildMC API. Generally, it should contain at least this code:
+the BuildMC API. Here is an example build script:
 
 ```python
 from buildmc import api, main
@@ -62,6 +64,18 @@ class Project(api.Project):
         self.pack_format('1.21.4')
         self.var_set('custom_variable', 'Hello World!')
 
+        self.add_dependency('modrinth_library', 'bundle', True,
+                            api.Dependency.Modrinth(id='abcd1234', id_type='version'))
+        self.add_dependency('other_modrinth_lib', 'bundle', True,
+                            api.Dependency.Modrinth(id='1234abcd', id_type='project'))
+        self.add_dependency('direct_lib', 'bundle', True,
+                            api.Dependency.URL(url='https://somewebsite.com/datapack.zip',
+                                               sha256='8150e3c1a479de9134baa13cea4ff78856cca5ebeb9bdfa87ecfce2e47ac9b5b'))
+        self.dependency('git_lib', 'bundle', True,
+                            api.Dependency.Git(url='https://github.com/someone/some_repo.git',
+                                               location='datapack/',
+                                               checkout='33465980-fa0c-11ef-9e4d-37376f7c2c4b'))
+
 
     def included_files(self):
         self.include_files('data/**/*', glob=True)
@@ -70,7 +84,7 @@ class Project(api.Project):
 
 
     def release_platforms(self):
-        pass
+        self.add_platform()
 
 
     def pack_overlays(self):
@@ -90,20 +104,161 @@ The script consists of two parts:
 
 The project class **has to override** the following methods:
 
-### Project meta: `project(self)`
+### Project meta & dependencies: `project(self)`
 
 ---
 
-Here, the project's basic meta is configured. This should - at least - include:
+Here, the project's basic meta is configured. This includes:
 
-- The project name, set using `self.project_name(str)`
-- The project version, set using `self.project_version(str)`
+- The project name, set using `self.project_name(name: str)`
+- The project version, set using `self.project_version(name: str)`
 - The pack type, set using `self.pack_type('data')` or `self.pack_type('resource')`
-- The pack format, set using either `self.pack_format(int)` or `self.pack_format(str)`
+- The pack format, set using either `self.pack_format(format: int | str)`
     - If you pass a **version name string**, the appropriate pack format number will be
       looked up using the [Version Meta Extractor](https://codeberg.org/helmo2019/buildmc#version-meta-index)
     - In this case, `self.pack_type(str)` needs to be called first, so the Version Meta Extractor
       can properly find out the format number
+
+Dependencies for the project may also be defined here using `self.add_dependency()`:
+
+```python
+self.add_dependency(
+    name: str,
+    deploy: LiteralString['bundle', 'ship', 'link', 'none'],
+    version_check: bool,
+    dependency: api.Dependency
+)
+```
+
+The `name` parameter is used for log messages.
+
+The `deploy` parameter defines whether the dependency will
+be **merged into** the project at build time (`bundle`),
+**uploaded / copied as an additional file** (`ship`) or
+linked (e.g. by URL) (`link`), or not deployed at all (`none`)
+
+If `version_check` is `True`, the downloaded dependency's
+`pack.mcmeta` is check to ensure it is compatible with
+the project.
+
+The `api.Dependency` class is **abstract** and cannot be
+instantiated directly. Instead, there are several subclasses
+of `api.Dependency`. The available built-in platforms are listed below.
+
+<br>
+
+---
+
+#### Local files or ZIP: `api.Dependency.Local`
+
+---
+
+Copies the dependency from another location on the
+local machine. The dependency can be either a ZIP
+file or a normal directory.
+
+**Parameters:**
+- `path: pathlib.Path`: The file path
+
+**Examples:**
+
+```python
+self.add_dependency('other_pack', 'bundle', True, api.Platform.Local(Path('~/.minecraft/saves/Other World/datapacks/my_library'))
+```
+
+<br>
+
+---
+
+#### File URL: `api.Dependency.URL`
+
+---
+
+Downloads the dependency in the format of a ZIP
+file from a URL.
+
+**Parameters:**
+- `url: str`: The URL to download from
+- `sha256: str`: Optional. SHA256 file hash for verification.
+- `version_check: bool`: Whether to verify that the dependency is compatible
+  with the project
+
+**Examples:**
+
+```python
+self.add_dependency('my_file', 'bundle', True,
+                    api.Platform.URL(url='https://example.com/datapack.zip',
+                                     sha256='8150e3c1a479de9134baa13cea4ff78856cca5ebeb9bdfa87ecfce2e47ac9b5b'))
+```
+
+<br>
+
+---
+
+#### Modrinth project: `api.Dependency.Modrinth`
+
+---
+
+Downloads the dependency from Modrinth.
+
+**Parameters**:
+- `id: str`: Either a **project ID** or a **version ID**
+  - If only a project ID is given, BuildMC will look
+    for the last project version that is available for
+    the project's version
+- `type: str`: Either `project` or `version`, referring to the `id` field
+- `version_check: bool`: Whether to verify that the dependency is compatible
+  with the project
+
+**Examples:**
+
+```python
+self.add_dependency('modrinth_library', 'bundle', True,
+                    api.Dependency.Modrinth(id='abcd1234', id_type='version'))
+```
+
+```python
+self.add_dependency('other_modrinth_lib', 'bundle', True,
+                    api.Dependency.Modrinth(id='1234abcd', id_type='project'))
+```
+
+<br>
+
+
+---
+
+#### Git repository: `api.Dependency.Git`
+
+---
+
+Downloads the dependency from a Git repository.
+
+**Parameters**:
+- `url: str`: URL to the Git repository
+- `location: str`: Optional. Directory in the Git repository which contains `pack.mcmeta`.
+- `checkout: str`: Optional. ID of the commit to check out.
+- `version_check: bool`: Optional. Whether to verify that the dependency is compatible
+  with the project.
+
+**Examples:**
+
+```python
+self.add_dependency('git_lib', 'bundle', True,
+                    api.Dependency.Git(url='https://github.com/someone/datapack.git'))
+```
+
+```python
+self.add_dependency('unmaintained_but_works', 'bundle', False,
+                    api.Dependency.Git(url='https://github.com/person/datapack.git'))
+```
+
+```python
+self.add_dependency('functions', 'link', True,
+                    api.Dependency.Git(url='https://github.com/group/big_mc_project.git',
+                                       location='datapack',
+                                       checkout='33465980-fa0c-11ef-9e4d-37376f7c2c4b'))
+```
+
 
 <br>
 
@@ -115,14 +270,14 @@ In this function, the files included in the project build are defined.
 
 To include a file, use the `self.include_files()` method:
 
-  ```python
-    self.include_files(
-        pattern: str,
-        process = False,
-        destination: Optional[str | Path] = None,
-        glob = False
-    )
-  ```
+```python
+self.include_files(
+    pattern: str,
+    process = False,
+    destination: Optional[str | Path] = None,
+    glob = False
+)
+```
 
 Parameters:
 
@@ -135,6 +290,8 @@ Parameters:
   [interpreted as a Glob pattern](https://en.wikipedia.org/wiki/Glob_(programming))
 
 <br>
+
+---
 
 #### File Destination
 
@@ -155,6 +312,8 @@ If no `destination` is set:
 
 <br>
 
+---
+
 #### Document Processing
 
 ---
@@ -170,7 +329,54 @@ when they're inserted into files.
 
 <br>
 
-### Defining platforms to release on with `release_platforms(self)`
+### Release platforms `release_platforms(self)`
 
 ---
 
+Here, you can define the platforms you want your project to
+be automatically uploaded to through the `publish:` task.
+When `publish:` is called, the project is built first with
+the `build` task and the resulting ZIP file is uploaded to
+the given platforms.
+
+Adding a platform is done using `self.add_platform()`:
+
+```python
+self.add_platform(
+    name: str,
+    platform: api.Platform
+)
+```
+
+The `name` parameter is used for logging messages.
+
+The `api.Platform` class is **abstract** and cannot be
+instantiated directly. Instead, there are several subclasses
+of `api.Platform`. The available built-in platforms are listed below.
+
+<br>
+
+---
+
+#### Local deployment: `api.Platform.Local`
+
+---
+
+Copies the ZIP file to a location on the local file machine.
+If a file from a previous build exists at the destination,
+it is removed.
+
+**Parameters:**
+ - `path: pathlib.Path`: The directory to copy the ZIP file to
+
+**Examples:**
+
+```python
+self.add_platform(api.Platform.Local(Path('~/.minecraft/saves/Development/datapacks')))
+```
+
+```python
+self.add_platform(api.Platform.Local(Path('~/.minecraft/resourcepacks')))
+```
+
+**(Future plans: Modrinth, Codeberg/Forgejo releases, GitHub releases)**
