@@ -1,5 +1,6 @@
 """API endpoints"""
 
 # Expose classes
-from ._classes import Dependency, Overlay, Platform
+from ._classes import Overlay, Platform
+from ._dependencies import Dependency
 from ._project import Project, ProjectFile

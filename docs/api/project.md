@@ -1,5 +1,3 @@
-from typing import LiteralString
-
 # BuildMC Documentation
 
 The `buildmc.api` module is hereby referred to as `api`.  
@@ -124,7 +122,7 @@ Dependencies for the project may also be defined here using `self.add_dependency
 ```python
 self.add_dependency(
     name: str,
-    deploy: LiteralString['bundle', 'ship', 'link', 'none'],
+    deploy: Literal['bundle', 'ship', 'link', 'none'],
     version_check: bool,
     dependency: api.Dependency
 )
@@ -163,7 +161,9 @@ file or a normal directory.
 **Examples:**
 
 ```python
-self.add_dependency('other_pack', 'bundle', True, api.Platform.Local(Path('~/.minecraft/saves/Other World/datapacks/my_library'))
+self.add_dependency('other_pack',
+                    'bundle', True, api.Platform.Local(Path(
+            '~/.minecraft/saves/Other World/datapacks/my_library'))
 ```
 
 <br>

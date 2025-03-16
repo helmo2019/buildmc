@@ -9,7 +9,7 @@ from typing import Any, Callable, Iterable, Literal, Optional
 import buildmc.ansi
 from buildmc import _config as cfg
 from buildmc.util import log, log_error, log_warn, pack_format_of
-from . import _classes as c
+from . import _classes as c, _dependencies as d
 
 
 @dataclass
@@ -147,19 +147,20 @@ class Project(ABC):
 
 
     def __init__(self):
-        self.dependencies: dict[str, c.Dependency] = { }
-        self.platforms: dict[str, c.Platform] = { }
-        self.files: dict[str, ProjectFile] = { }
-        self.overlays: dict[str, c.Overlay] = { }
-
+        # Project meta
         self.__variables: dict[str, Any] = { }
         self.__project_name: Optional[str] = None
         self.__project_version: Optional[str] = None
         self.__pack_format: Optional[int] = None
         self.__pack_type: Optional[Literal['data', 'resource']] = None
+
         # Files to be included in the pack build. Relative to <root dir>/../
         self.__pack_files: list[ProjectFile] = []
         self.__successful: bool = True
+
+        self.__dependencies: dict[str, d.Dependency] = { }
+        self.__platforms: dict[str, c.Platform] = { }
+        self.__overlays: dict[str, c.Overlay] = { }
 
 
     def project_version(self, project_version: str):
@@ -376,6 +377,23 @@ class Project(ABC):
         """
 
         return not self.__successful
+
+
+    def add_dependency(self,
+                       version_check: bool,
+                       dependency: 'd.Dependency'
+                       ):
+        """
+        Add and configure a project dependency
+
+        :param version_check: Whether to perform a version check
+        :param dependency: The dependency itself
+        """
+
+        self.__dependencies[dependency.name] = dependency
+        dependency.acquire(self)
+        if version_check:
+            dependency.version_check(self)
 
 
     @abstractmethod

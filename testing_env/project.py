@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from os import path
+from pathlib import Path
 from sys import path as module_path
 
 # Add buildmc to module path. For development purposes only,
@@ -17,6 +18,9 @@ class Project(api.Project):
         self.pack_type('data')
         self.pack_format('1.21.4')
         self.var_set('custom_variable', 'Hello World!')
+
+        self.add_dependency(True, api.Dependency.Local(self, 'chickens_lay_anything', 'none',
+                                                       Path('/home/moritz/.local/share/PrismLauncher/instances/main/.minecraft/saves/Datapacks & Creative/datapacks/chickens_lay_anything')))
 
 
     def release_platforms(self):
