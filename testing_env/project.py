@@ -35,6 +35,11 @@ class Project(api.Project):
                                                'https://github.com/CloudWolfYT/'
                                                'WASD-Detection/archive/refs/heads/main.zip',
                                                root=Path('WASD-Detection-main')))
+        self.add_dependency(api.dependency.Git(self, 'villager_stats_item', False, 'none',
+                                               'https://codeberg.org/helmo2019/minecraft-villager-stats-item.git'))
+        self.add_dependency(api.dependency.Git(self, 'veinminer_datapack', False, 'none',
+                                               'https://github.com/MiraculixxT/Veinminer.git',
+                                               location='datapacks/base'))
 
 
     def included_files(self):
