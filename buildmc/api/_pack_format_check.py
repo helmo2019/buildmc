@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Optional
 
-from buildmc.util import log, log_error, get_json
+from buildmc.util import get_json, log, log_error
 from . import _project as p
 
 
@@ -38,7 +38,7 @@ def pack_format_compatible(log_prefix: str, pack_mcmeta: Path, project: p.Projec
     # Make sure that 'pack' is in pack.mcmeta
     if 'pack' not in pack_mcmeta_json:
         log(f"{log_prefix}'pack.mcmeta' at '{pack_mcmeta}' is missing the 'pack' property!",
-              log_error)
+            log_error)
         project.fail()
         return
 
@@ -48,7 +48,7 @@ def pack_format_compatible(log_prefix: str, pack_mcmeta: Path, project: p.Projec
     # Get 'pack_format' property
     if 'pack_format' not in property_pack or not isinstance(property_pack['pack_format'], int):
         log(f"{log_prefix}'pack.mcmeta' at '{pack_mcmeta}' has an invalid 'pack.pack_format'"
-              f"property (missing or wrong type)!", log_error)
+            f"property (missing or wrong type)!", log_error)
         project.fail()
         return
 
@@ -89,7 +89,7 @@ def pack_format_compatible(log_prefix: str, pack_mcmeta: Path, project: p.Projec
         # Invalid property
         else:
             log(f"{log_prefix}'pack.mcmeta' at '{pack_mcmeta}' has an invalid"
-                  f"'pack.supported_formats' property!", log_error)
+                f"'pack.supported_formats' property!", log_error)
             project.fail()
             return
 
@@ -98,7 +98,7 @@ def pack_format_compatible(log_prefix: str, pack_mcmeta: Path, project: p.Projec
             supported_formats[0] <= property_pack_format <= supported_formats[1]
     ):
         log(f"{log_prefix}'pack.mcmeta' at '{pack_mcmeta}' has 'supported_formats', but it does"
-              "not contain the value of 'pack_format'!", log_error)
+            "not contain the value of 'pack_format'!", log_error)
         project.fail()
         return
 
@@ -110,8 +110,12 @@ def pack_format_compatible(log_prefix: str, pack_mcmeta: Path, project: p.Projec
             supported_formats is None
             and project_pack_format != property_pack_format
     ):
-        log(f"{log_prefix}Supports pack format(s) "
-              f"{property_pack_format if supported_formats is None else str(supported_formats)}"
-              f", making it incompatible with the project's pack format {project_pack_format}",
-              log_error)
+        if supported_formats is None:
+            supported_formats_string = str(property_pack_format)
+        else:
+            supported_formats_string = f'{supported_formats[0]}..{supported_formats[1]}'
+
+        log(f"{log_prefix}Supports pack format(s) {supported_formats_string}, making it incompatible with"
+            f" the project's pack format {project_pack_format}",
+            log_error)
         project.fail()

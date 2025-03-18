@@ -1,0 +1,1 @@
+from ._dependencies import Dependency, Local, URL

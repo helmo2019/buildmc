@@ -3,6 +3,7 @@ from os import path
 from pathlib import Path
 from sys import path as module_path
 
+
 # Add buildmc to module path. For development purposes only,
 # will be removed when I set up proper packaging.
 module_path.append(path.realpath(f'{path.dirname(__file__)}/../'))
@@ -19,12 +20,21 @@ class Project(api.Project):
         self.pack_format('1.21.4')
         self.var_set('custom_variable', 'Hello World!')
 
-        self.add_dependency(True, api.Dependency.Local(self, 'chickens_lay_anything', 'none',
-                                                       Path('/home/moritz/.local/share/PrismLauncher/instances/main/.minecraft/saves/Datapacks & Creative/datapacks/chickens_lay_anything')))
-
 
     def release_platforms(self):
         pass
+
+
+    def dependencies(self):
+        self.add_dependency(api.dependency.Local(self, 'chickens_lay_anything', False,
+                                                 'none',
+                                                 Path('/home/moritz/.local/share/PrismLauncher/instances/'
+                                                      'main/.minecraft/saves/Datapacks & Creative/datapacks/'
+                                                      'chickens_lay_anything')))
+        self.add_dependency(api.dependency.URL(self, 'wasd_detection', False, 'none',
+                                               'https://github.com/CloudWolfYT/'
+                                               'WASD-Detection/archive/refs/heads/main.zip',
+                                               root=Path('WASD-Detection-main')))
 
 
     def included_files(self):

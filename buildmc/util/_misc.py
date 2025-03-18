@@ -7,7 +7,8 @@ from pathlib import Path
 from sys import stderr, stdout
 from typing import Callable, Optional
 
-from buildmc import _config as cfg, ansi
+from buildmc import _config as cfg
+from buildmc.util import ansi
 
 
 def require_file(file_path: Path, type_checker: Callable[[Path], bool], *, generator: Callable[[Path], None] = None) \
@@ -100,6 +101,7 @@ def get_json_string(json_data: str) -> Optional[dict]:
 
 log_info = 0
 log_heading = 1
+log_sub_heading = 2
 log_warn = 10
 log_error = 11
 
@@ -109,6 +111,7 @@ def log(msg: str, level: int = log_info, flush: bool = False):
     print(
             (f" {ansi.bold}{ansi.green}ℹ{ansi.reset}" if level == log_info else
              f"{ansi.bold}{ansi.blue}==⇒{ansi.reset}{ansi.bold}" if level == log_heading else
+             f"{ansi.light_blue}--->{ansi.reset}{ansi.bold}" if level == log_sub_heading else
              f" {ansi.yellow}⚠" if level == log_warn else
              f" {ansi.red}{ansi.bold}⮾{ansi.not_bold}")
             + f" {msg}{ansi.reset}"

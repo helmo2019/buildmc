@@ -46,8 +46,6 @@ def cache_clean(name: Path) -> bool:
             # Re-create the cache as an empty directory
             cache_path.mkdir()
 
-            m.log(f"Cleaned cache '{cache_path.relative_to(cfg.buildmc_root / 'cache')}'")
-
             return True
         except shutil.Error:
             # Catch errors

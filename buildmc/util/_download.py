@@ -11,7 +11,7 @@ import requests
 from . import _misc as m
 
 
-def download(fp, url: str, rate_limit: int = -1, retries: int = 3, sha1_sum: Optional[str] = None) -> bool:
+def download(fp, url: str, *, rate_limit: int = -1, retries: int = 3, checksum: Optional[str] = None, checksum_algorithm = sha1) -> bool:
     """
     Download a file from a URL with a download rate limit (bytes / s) and verify using a SHA1 sum
 
@@ -19,7 +19,8 @@ def download(fp, url: str, rate_limit: int = -1, retries: int = 3, sha1_sum: Opt
     :param url: The URL to download from
     :param rate_limit: Maximum number of bytes to download in one second
     :param retries: How many times to retry the download in case of failure
-    :param sha1_sum: The SHA1 checksum to use for download validation
+    :param checksum: The checksum to use for download validation
+    :param checksum_algorithm: A checksum algorithm from hashlib. Defaults to SHA1.
     :return: Whether the download was successful
     """
 
@@ -57,7 +58,7 @@ def download(fp, url: str, rate_limit: int = -1, retries: int = 3, sha1_sum: Opt
                             sleep(expected_time - elapsed_time)
 
             # Verify hash
-            if sha1_sum is not None and not _verify_sha1(fp, sha1_sum):
+            if checksum is not None and not _verify_checksum(fp, checksum, checksum_algorithm):
                 # This error is caught in the second except clause below
                 raise ChecksumMismatchError()
 
@@ -84,7 +85,7 @@ def download_json(url: str, rate_limit: int = -1, sha1_sum: Optional[str] = None
 
     with BytesIO() as in_memory_file:
         # Download & verify file
-        if download(in_memory_file, url, rate_limit=rate_limit, sha1_sum=sha1_sum):
+        if download(in_memory_file, url, rate_limit=rate_limit, checksum=sha1_sum):
             # Parse json
             in_memory_file.seek(0)  # IMPORTANT!!!
             return json.load(in_memory_file)
@@ -100,7 +101,7 @@ class ChecksumMismatchError(Exception):
         super().__init__()
 
 
-def _verify_sha1(fp, expected: str) -> bool:
+def _verify_checksum(fp, expected: str, algorithm) -> bool:
     """
 
     :param fp:
@@ -108,7 +109,7 @@ def _verify_sha1(fp, expected: str) -> bool:
     :return:
     """
 
-    file_hash = sha1()
+    file_hash = algorithm()
     fp.seek(0)
     while data_block := fp.read(64 * 1024):  # Input the data in blocks of 64KiB
         file_hash.update(data_block)

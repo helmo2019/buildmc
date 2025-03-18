@@ -6,133 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Optional
 
-import buildmc.ansi
+import buildmc.util.ansi
 from buildmc import _config as cfg
-from buildmc.util import log, log_error, log_warn, pack_format_of
-from . import _classes as c, _dependencies as d
-
-
-@dataclass
-class ProjectFile:
-    source: Path
-    destination: Path
-    process: bool = False
-
-
-    def __process_and_copy(self, build_directory: Path, project: Optional['Project']):
-        """
-        Process the file: Substitute any '%{variable_name}'
-        with the value of 'variable_name'. Expects the destination
-        directory to exist.
-
-        :param project: The project to take variable values from
-        """
-
-        with self.source.open('r') as source_file, (build_directory / self.destination).open('w') as destination_file:
-            # Define operations
-            buffer = ""
-
-
-            def peek(characters: int = 1) -> str:
-                """Read the next character(s) without advancing the file pointer"""
-
-                current_position = source_file.tell()
-                next_char = source_file.read(characters)
-                source_file.seek(current_position)
-                return next_char
-
-
-            def consume(characters: int = 1):
-                """Discard the next character"""
-
-                source_file.read(characters)
-
-
-            def pop():
-                """Read the next character into the buffer"""
-
-                nonlocal buffer
-                buffer += source_file.read(1)
-
-
-            def push():
-                """Write the buffer into the destination file and empty it"""
-
-                nonlocal buffer
-                destination_file.write(buffer)
-                buffer = ""
-
-
-            while True:  # The loop is broken at appropriate points when end-of-file is reached
-                # While there is no begin of a variable substitution, simply read into the buffer
-                while peek(2) != '%{' and peek():
-                    pop()
-
-                # Push the buffer when we reach an opening '%{' / end-of-file
-                push()
-
-                # Break if we've reached end-of-file
-                if not peek():
-                    break
-
-                # Discard the '%{'
-                consume(2)
-
-                # Read the variable name into the buffer until we hit a '}' or end-of-file
-                while peek() != '}' and peek():
-                    pop()
-
-                # Reached end-of-file while looking for closing '}'
-                if not peek():
-                    log(f"While processing '{self.source}': Reached end-of-file while looking for closing '}}' for"
-                        f" '{buildmc.ansi.gray}%{{{buffer[:10]}{buildmc.ansi.reset} ...'", log_error)
-                    project.fail()
-                    break
-
-                # Look up variable value
-                if buffer not in project.var_list():
-                    log(f"While processing '{self.destination}': Unresolved variable reference '{buffer}'", log_warn)
-
-                buffer = str(project.var_get(buffer))
-                push()
-
-                # Discard the closing '}'
-                consume()
-
-
-    def copy(self, build_directory: Path, project: Optional['Project'] = None):
-        """
-        Process the file, if required, and copy it to the destination.
-
-        :param build_directory: The pack build directory
-        :param project: The project to take variables from when processing
-        """
-
-        if project.has_failed():
-            return
-
-        # Get paths
-        directory_tree = build_directory / self.destination.parent
-        destination = directory_tree / self.destination.name
-
-        # Create directories & copy file
-        directory_tree.mkdir(parents=True, exist_ok=True)
-
-        if self.process:
-            self.__process_and_copy(build_directory, project)
-        else:
-            try:
-                shutil.copyfile(self.source, destination)
-            except shutil.Error:
-                project.fail()
-
-
-    def __eq__(self, __value):
-        if isinstance(__value, ProjectFile):
-            return (self.source.resolve() == __value.source.resolve()
-                    and self.destination.resolve() == __value.destination.resolve())
-        else:
-            return False
+from buildmc.util import log, log_error, log_heading, log_warn, pack_format_of
+from . import _classes as c, dependency
 
 
 class Project(ABC):
@@ -158,9 +35,17 @@ class Project(ABC):
         self.__pack_files: list[ProjectFile] = []
         self.__successful: bool = True
 
-        self.__dependencies: dict[str, d.Dependency] = { }
+        self.__dependencies: dict[str, 'dependency.Dependency'] = { }
         self.__platforms: dict[str, c.Platform] = { }
         self.__overlays: dict[str, c.Overlay] = { }
+
+        self.__completed: dict[Callable, list[bool | str]] = {
+            self.project: [False, 'Configuring project'],
+            self.dependencies: [False, 'Configuring & acquiring dependencies'],
+            self.release_platforms: [False, 'Configuring platforms'],
+            self.included_files: [False, 'Configuring files'],
+            self.pack_overlays: [False, 'Configuring pack overlays']
+        }
 
 
     def project_version(self, project_version: str):
@@ -280,7 +165,7 @@ class Project(ABC):
                 [varname for varname in self.__variables.keys() if varname not in Project.__special_vars])
 
 
-    def pack_files(self) -> Iterable[ProjectFile]:
+    def iter_pack_files(self) -> Iterable['ProjectFile']:
         """
         Get an iterator of all pack files. The returned iterable
         contains tuples with two element each: The first element
@@ -290,7 +175,18 @@ class Project(ABC):
 
         :return: The iterator
         """
+
         return iter(self.__pack_files)
+
+
+    def iter_dependencies(self) -> Iterable['dependency.Dependency']:
+        """
+        Get an iterator over all project dependencies.
+
+        :return: An iterator of buildmc.api.dependency.Dependency objects
+        """
+
+        return iter(self.__dependencies.values())
 
 
     def include_files(self, pattern: str, *, process: bool = False, destination: Optional[str | Path] = None,
@@ -379,26 +275,38 @@ class Project(ABC):
         return not self.__successful
 
 
-    def add_dependency(self,
-                       version_check: bool,
-                       dependency: 'd.Dependency'
-                       ):
+    def ensure_completed(self, function: Callable):
+        """Ensure that a project function has been executed"""
+
+        if not function in self.__completed:
+            log(f"Unknown state '{str(function)}'", log_error)
+        else:
+            state_data = self.__completed[function]
+            if not state_data[0]:
+                log(state_data[1], log_heading)
+                function()
+                state_data[0] = True
+
+
+    def add_dependency(self, dep: 'dependency.Dependency'):
         """
         Add and configure a project dependency
 
-        :param version_check: Whether to perform a version check
-        :param dependency: The dependency itself
+        :param dep: The dependency itself
         """
 
-        self.__dependencies[dependency.name] = dependency
-        dependency.acquire(self)
-        if version_check:
-            dependency.version_check(self)
+        self.__dependencies[dep.name] = dep
 
 
     @abstractmethod
     def project(self):
         """Called when initializing the project"""
+        pass
+
+
+    @abstractmethod
+    def dependencies(self):
+        """Configures and acquires project dependencies"""
         pass
 
 
@@ -418,3 +326,126 @@ class Project(ABC):
     def pack_overlays(self):
         """Used by "patchtool". Defines the overlays that are available."""
         pass
+
+
+@dataclass
+class ProjectFile:
+    source: Path
+    destination: Path
+    process: bool = False
+
+
+    def __process_and_copy(self, build_directory: Path, project: Optional[Project]):
+        """
+        Process the file: Substitute any '%{variable_name}'
+        with the value of 'variable_name'. Expects the destination
+        directory to exist.
+
+        :param project: The project to take variable values from
+        """
+
+        with self.source.open('r') as source_file, (build_directory / self.destination).open('w') as destination_file:
+            # Define operations
+            buffer = ""
+
+
+            def peek(characters: int = 1) -> str:
+                """Read the next character(s) without advancing the file pointer"""
+
+                current_position = source_file.tell()
+                next_char = source_file.read(characters)
+                source_file.seek(current_position)
+                return next_char
+
+
+            def consume(characters: int = 1):
+                """Discard the next character"""
+
+                source_file.read(characters)
+
+
+            def pop():
+                """Read the next character into the buffer"""
+
+                nonlocal buffer
+                buffer += source_file.read(1)
+
+
+            def push():
+                """Write the buffer into the destination file and empty it"""
+
+                nonlocal buffer
+                destination_file.write(buffer)
+                buffer = ""
+
+
+            while True:  # The loop is broken at appropriate points when end-of-file is reached
+                # While there is no begin of a variable substitution, simply read into the buffer
+                while peek(2) != '%{' and peek():
+                    pop()
+
+                # Push the buffer when we reach an opening '%{' / end-of-file
+                push()
+
+                # Break if we've reached end-of-file
+                if not peek():
+                    break
+
+                # Discard the '%{'
+                consume(2)
+
+                # Read the variable name into the buffer until we hit a '}' or end-of-file
+                while peek() != '}' and peek():
+                    pop()
+
+                # Reached end-of-file while looking for closing '}'
+                if not peek():
+                    log(f"While processing '{self.source}': Reached end-of-file while looking for closing '}}' for"
+                        f" '{buildmc.util.ansi.gray}%{{{buffer[:10]}{buildmc.util.ansi.reset} ...'", log_error)
+                    project.fail()
+                    break
+
+                # Look up variable value
+                if buffer not in project.var_list():
+                    log(f"While processing '{self.destination}': Unresolved variable reference '{buffer}'", log_warn)
+
+                buffer = str(project.var_get(buffer))
+                push()
+
+                # Discard the closing '}'
+                consume()
+
+
+    def copy(self, build_directory: Path, project: Optional['Project'] = None):
+        """
+        Process the file, if required, and copy it to the destination.
+
+        :param build_directory: The pack build directory
+        :param project: The project to take variables from when processing
+        """
+
+        if project.has_failed():
+            return
+
+        # Get paths
+        directory_tree = build_directory / self.destination.parent
+        destination = directory_tree / self.destination.name
+
+        # Create directories & copy file
+        directory_tree.mkdir(parents=True, exist_ok=True)
+
+        if self.process:
+            self.__process_and_copy(build_directory, project)
+        else:
+            try:
+                shutil.copyfile(self.source, destination)
+            except shutil.Error:
+                project.fail()
+
+
+    def __eq__(self, __value):
+        if isinstance(__value, ProjectFile):
+            return (self.source.resolve() == __value.source.resolve()
+                    and self.destination.resolve() == __value.destination.resolve())
+        else:
+            return False

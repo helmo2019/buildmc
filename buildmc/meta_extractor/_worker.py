@@ -55,7 +55,7 @@ class WorkerProcess:
                     log(f"Downloading '{version_info['id']}' from '{jar_download['url']}'...", flush=True)
 
                     if not download(temp_file, jar_download['url'], rate_limit=self.bytes_per_second,
-                                  retries=self.retries, sha1_sum=jar_download['sha1']):
+                                    retries=self.retries, checksum=jar_download['sha1']):
                         log(f"Download for version '{version_info['id']}' failed!", log_error)
 
                     # Extract version.json
