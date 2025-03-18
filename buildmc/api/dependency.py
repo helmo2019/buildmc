@@ -4,16 +4,120 @@ import shutil
 from abc import ABC, abstractmethod
 from hashlib import sha256
 from pathlib import Path
-from subprocess import run, DEVNULL
-from typing import Literal, Optional
+from subprocess import DEVNULL, run
+from typing import Literal, Optional, TYPE_CHECKING
 from zipfile import ZipFile
 
 from buildmc import _config as cfg
-from buildmc.util import cache_clean, cache_get, download, log, log_error, log_warn
+from buildmc.util import ansi, cache_clean, cache_get, download, get_json, log, log_error, log_warn
 from . import _pack_format_check as f, _project as p
 
 
 _DEPLOYMENT = Literal['bundle', 'ship', 'link', 'none']
+
+
+class DependencyIndex:
+    """Manager class for .builmc/dependencies and index.json"""
+
+
+    def __init__(self, project: p.Project, managed_path: Path):
+        """
+        :param project: The project
+        :param managed_path: The path to the dependencies directory
+        """
+
+        self.project = project
+        self.managed_path = managed_path
+
+        # Read index data
+        index_data: dict = get_json(managed_path / 'index.json')
+        if index_data is None:
+            self.index: list[dict] = []
+        else:
+            self.index: list[dict] = index_data.get('dependencies', [])
+
+
+    def resolve_index(self):
+        """
+        Step one. Ensures that there are as many index entries
+        as there are directories in .buildmc/dependencies, and
+        that each index can be unambiguously mapped to a directory.
+        """
+
+        # Map UUID -> dir
+        uuid_to_dir: dict[str, Path] = { }
+        for dependency in self.managed_path.iterdir():
+            if TYPE_CHECKING: dependency: Path = dependency
+
+            if not dependency.is_dir():
+                continue
+
+            try:
+                with (dependency / '.buildmc_dependency_uuid').open('r') as uuid_file:
+                    uuid = uuid_file.read()
+                    if uuid in uuid_to_dir:
+                        log(f"Duplicate UUIDs for '{dependency.name}' and '{uuid_to_dir[uuid].name}. Deleting "
+                            f"both.'", log_warn)
+                        shutil.rmtree(dependency)
+                        shutil.rmtree(uuid_to_dir[uuid])
+                    else:
+                        uuid_to_dir[uuid] = dependency
+
+            except OSError:
+                log(f"Unable to read UUID file in dependency files '{dependency.name}'"
+                    '. Deleting.', log_warn)
+                shutil.rmtree(dependency)
+
+        # Resolve
+        for i in range(len(self.index)):
+            # noinspection PyTypeChecker
+            if (entry_uuid := self.index[i].get('uuid', None)) in uuid_to_dir:
+                if TYPE_CHECKING:
+                    entry_uuid: str = entry_uuid
+                del uuid_to_dir[entry_uuid]
+            else:
+                log('Removing orphaned index entry '
+                    + self.index[i].get('name', f'{ansi.italic}No Name{ansi.not_italic}')
+                    + f' ({entry_uuid})',
+                    log_warn)
+                del self.index[i]
+                i -= 1
+
+        # There are now only the directories in the dict
+        # that have no associated index entry. We can
+        # remove them.
+        for to_be_deleted in uuid_to_dir.values():
+            log(f"Removing orphaned dependency files '{to_be_deleted.name}'", log_warn)
+            shutil.rmtree(to_be_deleted)
+
+
+    def resolve_dependencies(self):
+        """
+        Second step. Finds the corresponding index entry
+        for each configured dependency, then acquires all
+        dependencies.
+        """
+
+        to_be_resolved: list[Dependency] = list(self.project.iter_dependencies())
+        to_be_mapped: list[dict] = self.index.copy()
+        config_to_entry: dict[Dependency, dict] = { }
+
+        for i in range(len(to_be_resolved)):
+            # Try to find a fitting index entry for each configured dependency
+            # 1. By name
+            for j in range(len(to_be_mapped)):
+                index_entry = to_be_mapped[j]
+                if index_entry['name'] == to_be_resolved[i].name:
+                    # Compare identity
+                    if to_be_resolved[i].matches_identity(index_entry['identity']):
+                        # Found a match!
+                        config_to_entry[to_be_resolved[i]] = index_entry
+                        del to_be_mapped[j]
+                        del to_be_resolved[i]
+                        i -= 1
+                        break
+
+        # TODO
 
 
 class Dependency(ABC):
@@ -66,6 +170,21 @@ class Dependency(ABC):
         """
         Download the data pack file tree to a cache location & return the path.
         If any errors occur, project.fail() is called and the function returns.
+        """
+        pass
+
+
+    @abstractmethod
+    def identity(self) -> dict:
+        """Generate the identity JSON data for this dependency"""
+        pass
+
+
+    @abstractmethod
+    def matches_identity(self, identity: dict) -> bool:
+        """
+        Check whether this dependency matches the
+        supplied identity from the dependency index
         """
         pass
 
@@ -206,6 +325,36 @@ class Local(Dependency):
                                                     archive_root=self.root)
 
 
+    def identity(self) -> dict:
+        result = {
+            'type': 'local',
+            'path_absolute': str(self.path.resolve()),
+            'path_relative': str(self.path.relative_to(cfg.script_directory)),
+            'file_type': 'directory' if self.path.is_dir() else 'file'
+        }
+
+        if self.root is not None and result['file_type'] == 'file':
+            result['archive_root'] = str(self.root)
+
+        return result
+
+
+    def matches_identity(self, identity: dict) -> bool:
+        if identity.get('type') != 'local':
+            return False
+
+        if (
+                identity.get('path_absolute') == self.path.resolve()
+                or identity.get('path_relative') == self.path.relative_to(cfg.script_directory)
+        ):
+            self_identity = self.identity()
+            if self_identity.get('file_type') == self_identity['file_type']:
+                if self_identity.get('archive_root') == identity.get('archive_root'):
+                    return True
+
+        return False
+
+
 class URL(Dependency):
 
     def __init__(self,
@@ -249,6 +398,34 @@ class URL(Dependency):
         self.location = self._handle_acquired_files(project, download_location, archive_root=self.root)
 
 
+    def identity(self) -> dict:
+        result = {
+            'type': 'url',
+            'url': self.url
+        }
+
+        if self.root is not None:
+            result['root'] = str(self.root)
+
+        if self.sha256_sum is not None:
+            result['sha256'] = self.sha256_sum
+
+        return result
+
+
+    def matches_identity(self, identity: dict) -> bool:
+        if identity.get('type') != 'url':
+            return False
+
+        if identity.get('url') == self.url:
+            self_identity = self.identity()
+            if (self_identity.get('root') == identity.get('root')
+                and self_identity.get('sha256') == identity.get('sha256')):
+                return True
+
+        return False
+
+
 class Git(Dependency):
 
     def __init__(self,
@@ -258,7 +435,7 @@ class Git(Dependency):
                  deployment: _DEPLOYMENT,
                  url: str,
                  *,
-                 location: Optional[str] = None,
+                 root: Optional[str] = None,
                  checkout: Optional[str] = None):
         """
         Configure a dependency downloaded from Git repository.
@@ -272,19 +449,19 @@ class Git(Dependency):
         :param version_check: Whether a compatibility check should be performed when acquiring
         :param deployment: In which way the dependency should be deployed alongside the project
         :param url: Download URL
-        :param location: Optional. Path inside the downloaded repository to take files from.
+        :param root: Optional. Path inside the downloaded repository to take files from.
         :param checkout: Commit SHA1 to check out
         """
 
         super().__init__(project, name, version_check, deployment)
         self.url = url
-        self.root = location
+        self.root = root
         self.checkout = checkout
 
 
     def acquire(self, project: p.Project):
         download_cache: Path = cache_get(Path('download'), True)
-        git_dir_args = ['--git-dir',str(download_cache / '.git'),'--work-tree',str(download_cache)]
+        git_dir_args = ['--git-dir', str(download_cache / '.git'), '--work-tree', str(download_cache)]
 
         if self.checkout is None:
             # Check out latest commit
@@ -305,13 +482,14 @@ class Git(Dependency):
             # Method 1, requires uploadpack.allowReachableSHA1InWant=true on client and server
             cache_clean(Path('download'))
             if (run(['git', 'init', str(download_cache)], stderr=DEVNULL, stdout=DEVNULL).returncode != 0
-                    or run(['git']+git_dir_args+['remote', 'add', 'origin',
-                            self.url], stderr=DEVNULL, stdout=DEVNULL).returncode != 0
-                    or run(['git']+git_dir_args+['fetch', '--depth', '1', 'origin',
-                            self.checkout], stderr=DEVNULL, stdout=DEVNULL) != 0
-                    or run(['git',]+git_dir_args+['checkout', 'FETCH_HEAD'], stderr=DEVNULL, stdout=DEVNULL).returncode != 0
-                    or run(['git']+git_dir_args+['submodule', 'update', '--init',
-                            '--recursive'], stderr=DEVNULL, stdout=DEVNULL).returncode != 0
+                    or run(['git'] + git_dir_args + ['remote', 'add', 'origin',
+                                                     self.url], stderr=DEVNULL, stdout=DEVNULL).returncode != 0
+                    or run(['git'] + git_dir_args + ['fetch', '--depth', '1', 'origin',
+                                                     self.checkout], stderr=DEVNULL, stdout=DEVNULL) != 0
+                    or run(['git', ] + git_dir_args + ['checkout', 'FETCH_HEAD'], stderr=DEVNULL,
+                           stdout=DEVNULL).returncode != 0
+                    or run(['git'] + git_dir_args + ['submodule', 'update', '--init',
+                                                     '--recursive'], stderr=DEVNULL, stdout=DEVNULL).returncode != 0
             ):
                 log(f"Unable to clone commit '{self.checkout}' from '{self.url}' using fetch method! Attempting full "
                     f"clone.", log_warn)
@@ -320,7 +498,8 @@ class Git(Dependency):
 
                 if (run(['git', 'clone', '--depth', '1', '--recurse-submodules', '--shallow-submodules', self.url,
                          str(download_cache)], stderr=DEVNULL, stdout=DEVNULL).returncode != 0
-                        or run(['git']+git_dir_args+['checkout', self.checkout], stderr=DEVNULL, stdout=DEVNULL).returncode != 0
+                        or run(['git'] + git_dir_args + ['checkout', self.checkout], stderr=DEVNULL,
+                               stdout=DEVNULL).returncode != 0
                 ):
                     log(f"Unable to clone Git repository '{self.url}' and check out commit '{self.checkout}'!",
                         log_error)
@@ -334,3 +513,29 @@ class Git(Dependency):
             return
 
         self.location = self._handle_acquired_files(project, copy_source)
+
+
+    def identity(self) -> dict:
+        result = {
+            'type': 'git',
+            'url': self.url
+        }
+
+        if self.root is not None:
+            result['root'] = str(self.root)
+
+        if self.checkout is not None:
+            result['checkout'] = self.checkout
+
+        return result
+
+
+    def matches_identity(self, identity: dict) -> bool:
+        if identity.get('type') != 'git':
+            return False
+
+        self_identity = self.identity()
+        return (
+                self_identity.get('root') == identity.get('root')
+                and self_identity.get('checkout') == identity.get('checkout')
+        )

@@ -46,6 +46,40 @@ The `identity` stores the parameters the dependencies
 was configured with. It is used to find the matching
 index entry for a configured dependency.
 
+#### Identity of `api.dependency.Local`
+
+```json
+{
+    "type": "local",
+    "path_absolute": "/absolute/file_path",
+    "path_relative": "../../relative/path",
+    "file_type": "directory | archive",
+    "archive_root": "archive/root" // Optional
+}
+```
+
+#### Identity of `api.dependency.URL`
+
+```json
+{
+    "type": "url",
+    "url": "https://example.com/file.zip",
+    "root": "archive/root", // Optional
+    "sha256": "checksum" // Optional
+}
+```
+
+#### Identity of `api.dependency.Git`
+
+```json
+{
+    "type": "git",
+    "url": "https://github.com/someone/repo.git",
+    "root": "datapacks/base", // Optional
+    "checkout": "commit sha1" // Optional
+}
+```
+
 ### UUID
 
 BuildMC creates a `.buildmc_dependency_uuid` file at the
@@ -86,6 +120,8 @@ to a directory.
    UUID-to-directory dictionary. If a directory's name does not match
    the `name` value in the index, it is renamed.
 3. Leftover index entries and directories are deleted
+
+<br>
 
 #### 2. Finding the correct Index entry for each configured dependency
 

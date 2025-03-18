@@ -39,7 +39,7 @@ class Project(api.Project):
                                                'https://codeberg.org/helmo2019/minecraft-villager-stats-item.git'))
         self.add_dependency(api.dependency.Git(self, 'veinminer_datapack', False, 'none',
                                                'https://github.com/MiraculixxT/Veinminer.git',
-                                               location='datapacks/base'))
+                                               root='datapacks/base'))
 
 
     def included_files(self):

@@ -14,5 +14,7 @@ gray = _ansi('38;2;150;150;150')
 purple = _ansi('38;2;122;41;165')
 blue = _ansi('38;2;79;141;234')
 light_blue = _ansi('38;2;78;152;216')
+italic = _ansi('3')
+not_italic = _ansi('23')
 
 reset = _ansi('0')
