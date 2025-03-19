@@ -26,20 +26,20 @@ class Project(api.Project):
 
 
     def dependencies(self):
-        self.add_dependency(api.dependency.Local(self, 'chickens_lay_anything', False,
-                                                 'none',
-                                                 Path('/home/moritz/.local/share/PrismLauncher/instances/'
-                                                      'main/.minecraft/saves/Datapacks & Creative/datapacks/'
-                                                      'chickens_lay_anything')))
+        # self.add_dependency(api.dependency.Local(self, 'chickens_lay_anything', False,
+        #                                          'none',
+        #                                          Path('/home/moritz/.local/share/PrismLauncher/instances/'
+        #                                               'main/.minecraft/saves/Datapacks & Creative/datapacks/'
+        #                                               'chickens_lay_anything')))
         self.add_dependency(api.dependency.URL(self, 'wasd_detection', False, 'none',
                                                'https://github.com/CloudWolfYT/'
-                                               'WASD-Detection/archive/refs/heads/main.zip',
-                                               root=Path('WASD-Detection-main')))
-        self.add_dependency(api.dependency.Git(self, 'villager_stats_item', False, 'none',
-                                               'https://codeberg.org/helmo2019/minecraft-villager-stats-item.git'))
-        self.add_dependency(api.dependency.Git(self, 'veinminer_datapack', False, 'none',
-                                               'https://github.com/MiraculixxT/Veinminer.git',
-                                               root='datapacks/base'))
+                                               'WASD-Detection/archive/refs/heads/main.zip'))
+        # self.add_dependency(api.dependency.Git(self, 'villager_stats_item', False, 'none',
+        #                                        'https://codeberg.org/helmo2019/minecraft-villager-stats-item.git'))
+        # self.add_dependency(api.dependency.Git(self, 'veinminer_datapack', False, 'none',
+        #                                        'https://github.com/MiraculixxT/Veinminer.git',
+        #                                        root='datapacks/base'))
+        pass
 
 
     def included_files(self):

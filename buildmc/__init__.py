@@ -59,7 +59,8 @@ def main(project_class: Type[api.Project], build_script_file_name: str):
 
     # Show end result
     if project.has_failed():
-        print(f'\n{util.ansi.red}{util.ansi.bold}[✘]{util.ansi.not_bold} Project build failed')
+        print(f'\n{util.ansi.red}{util.ansi.bold}[✘]{util.ansi.not_bold} Project build failed{util.ansi.reset}')
         exit(1)
     else:
-        print(f'\n{util.ansi.green}{util.ansi.bold}[✔]{util.ansi.not_bold} Project build successful')
+        api.tasks.post(project)
+        print(f'\n{util.ansi.green}{util.ansi.bold}[✔]{util.ansi.not_bold} Project build successful{util.ansi.reset}')

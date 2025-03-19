@@ -1,15 +1,17 @@
 """Project dependencies"""
 
+import json
 import shutil
 from abc import ABC, abstractmethod
 from hashlib import sha256
 from pathlib import Path
 from subprocess import DEVNULL, run
 from typing import Literal, Optional, TYPE_CHECKING
+from uuid import uuid4 as new_uuid
 from zipfile import ZipFile
 
 from buildmc import _config as cfg
-from buildmc.util import ansi, cache_clean, cache_get, download, get_json, log, log_error, log_warn
+from buildmc.util import ansi, cache_clean, cache_get, download, get_json, log, log_error, log_warn, log_sub_heading
 from . import _pack_format_check as f, _project as p
 
 
@@ -19,6 +21,8 @@ _DEPLOYMENT = Literal['bundle', 'ship', 'link', 'none']
 class DependencyIndex:
     """Manager class for .builmc/dependencies and index.json"""
 
+    __index_file_name = 'index.json'
+    __uuid_file_name = '.buildmc_dependency_uuid'
 
     def __init__(self, project: p.Project, managed_path: Path):
         """
@@ -30,14 +34,14 @@ class DependencyIndex:
         self.managed_path = managed_path
 
         # Read index data
-        index_data: dict = get_json(managed_path / 'index.json')
+        index_data: dict = get_json(managed_path / DependencyIndex.__index_file_name)
         if index_data is None:
             self.index: list[dict] = []
         else:
             self.index: list[dict] = index_data.get('dependencies', [])
 
 
-    def resolve_index(self):
+    def __resolve_index(self):
         """
         Step one. Ensures that there are as many index entries
         as there are directories in .buildmc/dependencies, and
@@ -53,7 +57,7 @@ class DependencyIndex:
                 continue
 
             try:
-                with (dependency / '.buildmc_dependency_uuid').open('r') as uuid_file:
+                with (dependency / DependencyIndex.__uuid_file_name).open('r') as uuid_file:
                     uuid = uuid_file.read()
                     if uuid in uuid_to_dir:
                         log(f"Duplicate UUIDs for '{dependency.name}' and '{uuid_to_dir[uuid].name}. Deleting "
@@ -98,6 +102,8 @@ class DependencyIndex:
         dependencies.
         """
 
+        self.__resolve_index()
+
         to_be_resolved: list[Dependency] = list(self.project.iter_dependencies())
         to_be_mapped: list[dict] = self.index.copy()
         config_to_entry: dict[Dependency, dict] = { }
@@ -117,7 +123,73 @@ class DependencyIndex:
                         i -= 1
                         break
 
-        # TODO
+        # If there are only leftover index entries
+        if len(to_be_resolved) == 0 and len(to_be_mapped) > 0:
+            # Remove them along with their directories
+            for leftover_entry in to_be_mapped:
+                log(f"Removing unused dependency '{leftover_entry["name"]}'", log_warn)
+                shutil.rmtree(self.managed_path / leftover_entry['name'])
+        # There are both leftover index entries and leftover configured dependencies
+        elif len(to_be_resolved) > 0 and len(to_be_mapped) > 0:
+            # Attempt to match them by identity
+            for i in range(len(to_be_resolved)):
+                dependency: Dependency = to_be_resolved[i]
+                for j in range(len(to_be_resolved)):
+                    index_entry: dict = to_be_mapped[j]
+                    if dependency.matches_identity(index_entry['identity']):
+                        # Index entry's identity matches Dependency's identity
+                        # 1. Correct index & directory name
+                        shutil.move(self.managed_path / index_entry['name'], self.managed_path / dependency.name)
+                        index_entry['name'] = dependency.name
+
+                        # 2. Remove from the lists and map
+                        del to_be_resolved[i]
+                        del to_be_mapped[j]
+                        i -= 1
+                        config_to_entry[dependency] = index_entry
+                        break
+        # There are leftover configured dependencies
+        else:
+            # Acquire them
+            for dep in to_be_resolved:
+                log(f"Acquiring '{dep.name}'", log_sub_heading)
+                dep.acquire(self.project)
+
+                if self.project.has_failed():
+                    return
+
+                if dep.do_version_check:
+                    dep.version_check(self.project)
+
+                if self.project.has_failed():
+                    return
+
+
+    def save_index(self):
+        """Regenerate index and UUID files"""
+
+        dependency_list: list[dict] = []
+
+        for dependency in self.project.iter_dependencies():
+            # Regenerate UUID
+            dependency_uuid = str(new_uuid())
+
+            # Write to file
+            with (self.managed_path / dependency.name / DependencyIndex.__uuid_file_name).open('w') as uuid_file:
+                uuid_file.write(dependency_uuid)
+
+            # Generate JSON
+            dependency_list.append({
+                'name': dependency.name,
+                'identity': dependency.identity(),
+                'uuid': dependency_uuid
+            })
+
+
+        with (self.managed_path / DependencyIndex.__index_file_name).open('w') as index_file:
+            json.dump({
+                'dependencies': dependency_list
+            }, index_file, indent=4, ensure_ascii=False)
 
 
 class Dependency(ABC):
@@ -252,14 +324,6 @@ class Dependency(ABC):
         # Return (for now) if the destination already exists
         destination: Path = Dependency.get_destination_directory() / self.name
         if destination.exists():
-            # TODO: Implement dependency index which keeps
-            # TODO:  track of which dependencies have been
-            # TODO:  downloaded and where. Add a '.buildmc_dep'
-            # TODO:  file inside the downloaded dependency
-            # TODO:  which contains a UUID. If destination.is_dir(),
-            # TODO:  the correct UUID is looked up in the index.
-            # TODO:  If the UUID is different or absent from
-            # TODO:  the index, the dependency is re-acquired.
             log(f"Dependency '{self.name}' already acquired")
             return destination
 
@@ -413,6 +477,7 @@ class URL(Dependency):
         return result
 
 
+    # TODO fix
     def matches_identity(self, identity: dict) -> bool:
         if identity.get('type') != 'url':
             return False
@@ -420,7 +485,7 @@ class URL(Dependency):
         if identity.get('url') == self.url:
             self_identity = self.identity()
             if (self_identity.get('root') == identity.get('root')
-                and self_identity.get('sha256') == identity.get('sha256')):
+                    and self_identity.get('sha256') == identity.get('sha256')):
                 return True
 
         return False
@@ -460,6 +525,13 @@ class Git(Dependency):
 
 
     def acquire(self, project: p.Project):
+        try:
+            run(['git'], stdout=DEVNULL, stderr=DEVNULL)
+        except FileNotFoundError:
+            log('Git is not installed!', log_error)
+            project.fail()
+            return
+
         download_cache: Path = cache_get(Path('download'), True)
         git_dir_args = ['--git-dir', str(download_cache / '.git'), '--work-tree', str(download_cache)]
 

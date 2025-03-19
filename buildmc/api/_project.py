@@ -24,6 +24,9 @@ class Project(ABC):
 
 
     def __init__(self):
+        # Dependency manager
+        self.dependency_index = dependency.DependencyIndex(self, cfg.buildmc_root / 'dependencies')
+
         # Project meta
         self.__variables: dict[str, Any] = { }
         self.__project_name: Optional[str] = None
@@ -41,10 +44,11 @@ class Project(ABC):
 
         self.__completed: dict[Callable, list[bool | str]] = {
             self.project: [False, 'Configuring project'],
-            self.dependencies: [False, 'Configuring & acquiring dependencies'],
+            self.dependencies: [False, 'Configuring dependencies'],
             self.release_platforms: [False, 'Configuring platforms'],
             self.included_files: [False, 'Configuring files'],
-            self.pack_overlays: [False, 'Configuring pack overlays']
+            self.pack_overlays: [False, 'Configuring pack overlays'],
+            self.dependency_index.resolve_dependencies: [False, 'Resolving dependencies']
         }
 
 

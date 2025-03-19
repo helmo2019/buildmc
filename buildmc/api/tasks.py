@@ -75,19 +75,13 @@ def dependencies(project: p.Project):
 
     project.ensure_completed(project.project)
     project.ensure_completed(project.dependencies)
+    project.ensure_completed(project.dependency_index.resolve_dependencies)
 
-    for dep in project.iter_dependencies():
-        log(f"Acquiring '{dep.name}'", log_sub_heading)
-        dep.acquire(project)
 
-        if project.has_failed():
-            return
+def post(project: p.Project):
+    """Runs after all other tasks"""
 
-        if dep.do_version_check:
-            dep.version_check(project)
-
-        if project.has_failed():
-            return
+    project.dependency_index.save_index()
 
     cache_clean(Path('download'))
     cache_clean(Path('unpack'))
