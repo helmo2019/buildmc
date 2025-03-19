@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import _misc as m
-from .. import _config as cfg
+from .. import config as cfg
 
 
 def cache_clean_all():

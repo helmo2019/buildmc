@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from . import _cache as c, _misc as m, log_error
-from .. import _config as cfg, meta_extractor
+from .. import config as cfg, meta_extractor
 from ..util import download
 
 

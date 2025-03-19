@@ -54,7 +54,8 @@ index entry for a configured dependency.
     "path_absolute": "/absolute/file_path",
     "path_relative": "../../relative/path",
     "file_type": "directory | archive",
-    "archive_root": "archive/root" // Optional
+    "archive_root": "archive/root"
+    // Optional
 }
 ```
 
@@ -64,8 +65,10 @@ index entry for a configured dependency.
 {
     "type": "url",
     "url": "https://example.com/file.zip",
-    "root": "archive/root", // Optional
-    "sha256": "checksum" // Optional
+    "root": "archive/root",
+    // Optional
+    "sha256": "checksum"
+    // Optional
 }
 ```
 
@@ -75,8 +78,10 @@ index entry for a configured dependency.
 {
     "type": "git",
     "url": "https://github.com/someone/repo.git",
-    "root": "datapacks/base", // Optional
-    "checkout": "commit sha1" // Optional
+    "root": "datapacks/base",
+    // Optional
+    "checkout": "commit sha1"
+    // Optional
 }
 ```
 
@@ -135,16 +140,21 @@ mapped to an index entry, and therefore, to a directory.
    Only if both `name` and `identity` match, the index entry
    and the configured dependency will be mapped.
 2.
-    1. If there are **leftover index entries**: The index entries and the
-       respective files are deleted
-    2. If there are **leftover configured dependencies**: The dependencies
-       are acquired and added to the index
-    3. If there are **both** leftover index entries and leftover configured
-       dependencies:
-        1. Try to map them using the `identity`. If a match is found, the
-           index entry's `name` field is corrected and the respective
-           directory is renamed.
-        2. Any index entries that are still left will be deleted along
-           with their respective files
-        3. Any configured dependencies that are still left will be
-           (re)acquired
+    - If there are **both** leftover index entries and leftover configured
+      dependencies: Try to map them using the `identity`. If a match is found, the
+      index entry's `name` field is corrected and the respective
+      directory is renamed.
+    - Any index entries that are still left after this will be deleted along
+      with their respective files
+    - Any configured dependencies that are still left after this will be acquired
+
+<br>
+
+#### 3. Saving the index (run after all tasks)
+
+---
+
+A JSON object is generated for each dependency, as described above.
+It contains `name` and generated `identity`. The `uuid` is newly
+generated and written to the respective `.buildmc_dependency_uuid`
+file.

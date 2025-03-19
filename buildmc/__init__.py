@@ -4,7 +4,7 @@ from pathlib import Path
 from sys import argv, exit
 from typing import Type
 
-from buildmc import _config as cfg, api, util
+from buildmc import config as cfg, api, util
 
 
 def main(project_class: Type[api.Project], build_script_file_name: str):

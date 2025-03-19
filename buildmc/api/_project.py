@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Optional
 
 import buildmc.util.ansi
-from buildmc import _config as cfg
+from buildmc import config as cfg
 from buildmc.util import log, log_error, log_heading, log_warn, pack_format_of
 from . import _classes as c, dependency
 

@@ -1,18 +1,21 @@
 import shutil
 from os import path
+from pathlib import Path
 from unittest import TestCase
 
-import buildmc.api._project
-from buildmc import _config as cfg, api
-from buildmc.util import log
+from buildmc import config as cfg, api, util
 
 
-class TestProject(buildmc.api._project.Project):
+class TestProject(api.Project):
 
     def project(self):
-        self.project_version = '1.0-DEBUG'
+        self.project_version('1.0-DEBUG')
         self.pack_type('data')
         self.pack_format('1.21.4')
+
+
+    def dependencies(self):
+        pass
 
 
     def release_platforms(self):
@@ -40,7 +43,7 @@ class ProjectTests(TestCase):
         if ProjectTests.clean_up_before and path.isdir(cfg.buildmc_root):
             shutil.rmtree(cfg.buildmc_root)
 
-        cls.project: buildmc.api._project.Project = TestProject()
+        cls.project: api.Project = TestProject()
 
 
     @classmethod
@@ -53,7 +56,8 @@ class ProjectTests(TestCase):
     def setUp(cls):
         # Reset config & set root path before each test
         cfg.reset()
-        cfg.buildmc_root = path.realpath("./buildmc_debug")
+        cfg.buildmc_root = Path("./buildmc_debug").resolve()
+        cfg.script_directory = Path(__file__).parent.resolve()
 
 
 class ProjectConfigTests(ProjectTests):
@@ -80,7 +84,35 @@ class ProjectConfigTests(ProjectTests):
         self.assertEqual(project_pack_type, 'data', 'Pack type')
         self.assertEqual(my_variable, 123, 'Custom variable')
 
-        log(f'Project version: {project_version}')
-        log(f'Project pack format: {project_pack_format}')
-        log(f'Project pack_type: {project_pack_type}')
-        log(f"Custom variable 'my_variable': {my_variable}")
+        util.log(f'Project version: {project_version}')
+        util.log(f'Project pack format: {project_pack_format}')
+        util.log(f'Project pack_type: {project_pack_type}')
+        util.log(f"Custom variable 'my_variable': {my_variable}")
+
+
+class DependencyIdentityTests(ProjectTests):
+
+    def test__local(self):
+        example_datapack = ('/home/moritz/.local/share/PrismLauncher/instances/main/.minecraft/'
+                                        'saves/Datapacks & Creative/datapacks/chickens_lay_anything')
+
+        dep = api.dependency.Local(DependencyIdentityTests.project, 'file_dependency', False, 'none',
+                                   Path(example_datapack))
+        dep_identity = dep.identity()
+
+        identity_1 = {
+            'type': 'local',
+            'path_absolute': '/some/nonexistent/path',
+            'path_relative': '../../../',
+            'file_type': 'directory'
+        }
+
+        identity_2 = {
+            'type': 'local',
+            'path_absolute': '/some/nonexistent/path',
+            'path_relative': dep_identity['path_relative'],
+            'file_type': 'directory'
+        }
+
+        self.assertFalse(dep.matches_identity(identity_1))
+        self.assertTrue(dep.matches_identity(identity_2))

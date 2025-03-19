@@ -4,14 +4,15 @@ import json
 import shutil
 from abc import ABC, abstractmethod
 from hashlib import sha256
+from os.path import relpath
 from pathlib import Path
 from subprocess import DEVNULL, run
 from typing import Literal, Optional, TYPE_CHECKING
 from uuid import uuid4 as new_uuid
 from zipfile import ZipFile
 
-from buildmc import _config as cfg
-from buildmc.util import ansi, cache_clean, cache_get, download, get_json, log, log_error, log_warn, log_sub_heading
+from buildmc import config as cfg
+from buildmc.util import ansi, cache_clean, cache_get, download, get_json, log, log_error, log_sub_heading, log_warn
 from . import _pack_format_check as f, _project as p
 
 
@@ -23,6 +24,7 @@ class DependencyIndex:
 
     __index_file_name = 'index.json'
     __uuid_file_name = '.buildmc_dependency_uuid'
+
 
     def __init__(self, project: p.Project, managed_path: Path):
         """
@@ -68,7 +70,7 @@ class DependencyIndex:
                         uuid_to_dir[uuid] = dependency
 
             except OSError:
-                log(f"Unable to read UUID file in dependency files '{dependency.name}'"
+                log(f"Unable to read UUID file in dependency files of '{dependency.name}'"
                     '. Deleting.', log_warn)
                 shutil.rmtree(dependency)
 
@@ -109,6 +111,8 @@ class DependencyIndex:
         config_to_entry: dict[Dependency, dict] = { }
 
         for i in range(len(to_be_resolved)):
+            if i >= len(to_be_resolved):
+                break
             # Try to find a fitting index entry for each configured dependency
             # 1. By name
             for j in range(len(to_be_mapped)):
@@ -123,16 +127,13 @@ class DependencyIndex:
                         i -= 1
                         break
 
-        # If there are only leftover index entries
-        if len(to_be_resolved) == 0 and len(to_be_mapped) > 0:
-            # Remove them along with their directories
-            for leftover_entry in to_be_mapped:
-                log(f"Removing unused dependency '{leftover_entry["name"]}'", log_warn)
-                shutil.rmtree(self.managed_path / leftover_entry['name'])
         # There are both leftover index entries and leftover configured dependencies
-        elif len(to_be_resolved) > 0 and len(to_be_mapped) > 0:
+        if len(to_be_resolved) > 0 and len(to_be_mapped) > 0:
             # Attempt to match them by identity
             for i in range(len(to_be_resolved)):
+                if i >= len(to_be_resolved):
+                    break
+
                 dependency: Dependency = to_be_resolved[i]
                 for j in range(len(to_be_resolved)):
                     index_entry: dict = to_be_mapped[j]
@@ -148,14 +149,24 @@ class DependencyIndex:
                         i -= 1
                         config_to_entry[dependency] = index_entry
                         break
-        # There are leftover configured dependencies
-        else:
+
+        # There are still leftover index entries
+        if len(to_be_resolved) == 0 and len(to_be_mapped) > 0:
+            # Remove them along with their directories
+            for leftover_entry in to_be_mapped:
+                log(f"Removing unused dependency '{leftover_entry['name']}'", log_warn)
+                shutil.rmtree(self.managed_path / leftover_entry['name'])
+
+        # There are still leftover configured dependencies
+        if len(to_be_resolved) > 0:
             # Acquire them
             for dep in to_be_resolved:
                 log(f"Acquiring '{dep.name}'", log_sub_heading)
                 dep.acquire(self.project)
 
                 if self.project.has_failed():
+                    if (dep_files := (self.managed_path / dep.name)).exists():
+                        shutil.rmtree(dep_files)
                     return
 
                 if dep.do_version_check:
@@ -184,7 +195,6 @@ class DependencyIndex:
                 'identity': dependency.identity(),
                 'uuid': dependency_uuid
             })
-
 
         with (self.managed_path / DependencyIndex.__index_file_name).open('w') as index_file:
             json.dump({
@@ -380,7 +390,7 @@ class Local(Dependency):
         :param archive_root: ZIP file only. Path inside the archive to take files from.
         """
         super().__init__(project, name, version_check, deployment)
-        self.path = path.resolve()
+        self.path = path.expanduser().resolve()
         self.root = archive_root
 
 
@@ -393,7 +403,7 @@ class Local(Dependency):
         result = {
             'type': 'local',
             'path_absolute': str(self.path.resolve()),
-            'path_relative': str(self.path.relative_to(cfg.script_directory)),
+            'path_relative': relpath(str(self.path.resolve()), str(cfg.script_directory.resolve())),
             'file_type': 'directory' if self.path.is_dir() else 'file'
         }
 
@@ -407,16 +417,15 @@ class Local(Dependency):
         if identity.get('type') != 'local':
             return False
 
-        if (
-                identity.get('path_absolute') == self.path.resolve()
-                or identity.get('path_relative') == self.path.relative_to(cfg.script_directory)
-        ):
-            self_identity = self.identity()
-            if self_identity.get('file_type') == self_identity['file_type']:
-                if self_identity.get('archive_root') == identity.get('archive_root'):
-                    return True
-
-        return False
+        self_identity = self.identity()
+        return (
+            # EITHER relative or absolute path should match
+                (identity.get('path_absolute') == self_identity.get('path_absolute')
+                 or identity.get('path_relative') == self_identity.get('path_relative'))
+                # BOTH file type and archive root need to match
+                and identity.get('file_type') == self_identity.get('file_type')
+                and identity.get('archive_root') == self_identity.get('archive_root')
+        )
 
 
 class URL(Dependency):
@@ -611,3 +620,7 @@ class Git(Dependency):
                 self_identity.get('root') == identity.get('root')
                 and self_identity.get('checkout') == identity.get('checkout')
         )
+
+
+
+# TODO: Modrinth

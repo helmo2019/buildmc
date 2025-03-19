@@ -49,6 +49,8 @@ Available tasks are:
 The build script is simply a regular Python 3 script that uses
 the BuildMC API. Here is an example build script:
 
+TODO: Update
+
 ```python
 from buildmc import api, main
 
@@ -70,9 +72,9 @@ class Project(api.Project):
                             api.Dependency.URL(url='https://somewebsite.com/datapack.zip',
                                                sha256='8150e3c1a479de9134baa13cea4ff78856cca5ebeb9bdfa87ecfce2e47ac9b5b'))
         self.dependency('git_lib', 'bundle', True,
-                            api.Dependency.Git(url='https://github.com/someone/some_repo.git',
-                                               location='datapack/',
-                                               checkout='33465980-fa0c-11ef-9e4d-37376f7c2c4b'))
+                        api.Dependency.Git(url='https://github.com/someone/some_repo.git',
+                                           location='datapack/',
+                                           checkout='33465980-fa0c-11ef-9e4d-37376f7c2c4b'))
 
 
     def included_files(self):
@@ -102,7 +104,7 @@ The script consists of two parts:
 
 The project class **has to override** the following methods:
 
-### Project meta & dependencies: `project(self)`
+### Project meta: `project(self)`
 
 ---
 
@@ -117,31 +119,40 @@ Here, the project's basic meta is configured. This includes:
     - In this case, `self.pack_type(str)` needs to be called first, so the Version Meta Extractor
       can properly find out the format number
 
-Dependencies for the project may also be defined here using `self.add_dependency()`:
+<br>
+
+### Dependencies: `dependencies(self)`
+
+---
+
+Dependencies for the project may be defined here using `self.add_dependency()`:
 
 ```python
 self.add_dependency(
-    name: str,
-    deploy: Literal['bundle', 'ship', 'link', 'none'],
-    version_check: bool,
-    dependency: api.Dependency
+        dependency: api.Dependency
 )
 ```
-
-The `name` parameter is used for log messages.
-
-The `deploy` parameter defines whether the dependency will
-be **merged into** the project at build time (`bundle`),
-**uploaded / copied as an additional file** (`ship`) or
-linked (e.g. by URL) (`link`), or not deployed at all (`none`)
-
-If `version_check` is `True`, the downloaded dependency's
-`pack.mcmeta` is check to ensure it is compatible with
-the project.
 
 The `api.Dependency` class is **abstract** and cannot be
 instantiated directly. Instead, there are several subclasses
 of `api.Dependency`. The available built-in platforms are listed below.
+All dependency classes have a set of common constructor
+parameters:
+
+- `project: api.Project`: The project itself. Use `self` in your build script
+- `name: str`: The dependency's name. This is also the name of the
+  directory containing the dependency's files in `.buildmc/dependencies`,
+  and the `name` field of the dependency's index entry.
+- `version_check: bool`: Whether to perform a version check. If the dependency
+  is found to be incompatible with the project, the build fails.
+- `deployment: 'bundle' | 'ship' | 'link' | 'none'`: Defines whether the dependency will
+  be **merged into** the project at build time (`bundle`),
+  **uploaded / copied as an additional file** (`ship`) or
+  linked (e.g. by URL) (`link`), or not deployed at all (`none`)
+
+Only the constructor parameters that are not listed above will
+be listed in each Dependency subclass's respective section.
+
 
 <br>
 
@@ -156,14 +167,28 @@ local machine. The dependency can be either a ZIP
 file or a normal directory.
 
 **Parameters:**
+
 - `path: pathlib.Path`: The file path
+- `archive_root: Optional[Path]`: Optional. For ZIP files only. Path inside the archive to take files from.
 
 **Examples:**
 
+Copy normal files:
+
 ```python
-self.add_dependency('other_pack',
-                    'bundle', True, api.Platform.Local(Path(
-            '~/.minecraft/saves/Other World/datapacks/my_library'))
+self.add_dependency(api.dependency.Local(
+        self, 'other_pack', True, 'bundle',
+        Path('~/.minecraft/saves/Other World/datapacks/my_library')))
+```
+
+Copy a folder inside a ZIP archive:
+
+```python
+self.add_dependency(api.dependency.Local(
+        self, 'zip_file', True, 'link',
+        Path('~/Documents/minecraft_libraries.zip'),
+        archive_root=Path('datapacks/small_library')
+))
 ```
 
 <br>
@@ -178,10 +203,10 @@ Downloads the dependency in the format of a ZIP
 file from a URL.
 
 **Parameters:**
+
 - `url: str`: The URL to download from
-- `sha256: str`: Optional. SHA256 file hash for verification.
-- `version_check: bool`: Whether to verify that the dependency is compatible
-  with the project
+- `root: Optional[Path]`: Optional. Path inside the downloaded archive to take files from
+- `sha256: Optional[str]`: Optional. SHA256 file hash for verification.
 
 **Examples:**
 
@@ -202,10 +227,11 @@ self.add_dependency('my_file', 'bundle', True,
 Downloads the dependency from Modrinth.
 
 **Parameters**:
+
 - `id: str`: Either a **project ID** or a **version ID**
-  - If only a project ID is given, BuildMC will look
-    for the last project version that is available for
-    the project's version
+    - If only a project ID is given, BuildMC will look
+      for the last project version that is available for
+      the project's version
 - `type: str`: Either `project` or `version`, referring to the `id` field
 - `version_check: bool`: Whether to verify that the dependency is compatible
   with the project
@@ -234,13 +260,14 @@ self.add_dependency('other_modrinth_lib', 'bundle', True,
 Downloads the dependency from a Git repository.
 
 **Parameters**:
+
 - `url: str`: URL to the Git repository
-- `location: str`: Optional. Directory in the Git repository which contains `pack.mcmeta`.
-- `checkout: str`: Optional. ID of the commit to check out.
-- `version_check: bool`: Optional. Whether to verify that the dependency is compatible
-  with the project.
+- `root: Optional[str]`: Optional. Directory in the Git repository which contains `pack.mcmeta`.
+- `checkout: Optional[str]`: Optional. SHA1 of the commit to check out.
 
 **Examples:**
+
+
 
 ```python
 self.add_dependency('git_lib', 'bundle', True,
@@ -259,7 +286,6 @@ self.add_dependency('functions', 'link', True,
                                        checkout='33465980-fa0c-11ef-9e4d-37376f7c2c4b'))
 ```
 
-
 <br>
 
 ### Files included in the build: `included_files(self)`
@@ -272,10 +298,10 @@ To include a file, use the `self.include_files()` method:
 
 ```python
 self.include_files(
-    pattern: str,
-    process = False,
-    destination: Optional[str | Path] = None,
-    glob = False
+        pattern: str,
+process = False,
+destination: Optional[str | Path] = None,
+glob = False
 )
 ```
 
@@ -343,8 +369,8 @@ Adding a platform is done using `self.add_platform()`:
 
 ```python
 self.add_platform(
-    name: str,
-    platform: api.Platform
+        name: str,
+platform: api.Platform
 )
 ```
 
@@ -367,7 +393,8 @@ If a file from a previous build exists at the destination,
 it is removed.
 
 **Parameters:**
- - `path: pathlib.Path`: The directory to copy the ZIP file to
+
+- `path: pathlib.Path`: The directory to copy the ZIP file to
 
 **Examples:**
 

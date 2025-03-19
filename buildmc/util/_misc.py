@@ -7,7 +7,7 @@ from pathlib import Path
 from sys import stderr, stdout
 from typing import Callable, Optional
 
-from buildmc import _config as cfg
+from buildmc import config as cfg
 from buildmc.util import ansi
 
 
