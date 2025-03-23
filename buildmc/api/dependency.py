@@ -1,16 +1,18 @@
 """Project dependencies"""
 
+from os.path import relpath
+from zipfile import ZipFile
+
 import json
 import shutil
 from abc import ABC, abstractmethod
 from hashlib import sha256
-from os.path import relpath
 from pathlib import Path
 from subprocess import DEVNULL, run
 from typing import Literal, Optional, TYPE_CHECKING
 from uuid import uuid4 as new_uuid
-from zipfile import ZipFile
 
+import modrinth
 from buildmc import config as cfg
 from buildmc.util import ansi, cache_clean, cache_get, download, get_json, log, log_error, log_sub_heading, log_warn
 from . import _pack_format_check as f, _project as p
@@ -197,6 +199,9 @@ class DependencyIndex:
             })
 
         with (self.managed_path / DependencyIndex.__index_file_name).open('w') as index_file:
+            # For some reason, PyCharm says the type of index_files is
+            # not correct for json.dump, but it works just fine...
+            # noinspection PyTypeChecker
             json.dump({
                 'dependencies': dependency_list
             }, index_file, indent=4, ensure_ascii=False)
@@ -214,7 +219,7 @@ class Dependency(ABC):
         :return: The path
         """
 
-        destination: Path = cfg.buildmc_root / 'dependencies'
+        destination: Path = cfg.global_options.buildmc_root / 'dependencies'
         if destination.exists():
             if not destination.is_dir():
                 log(f"Dependency destination '{destination}' exists,"
@@ -403,7 +408,7 @@ class Local(Dependency):
         result = {
             'type': 'local',
             'path_absolute': str(self.path.resolve()),
-            'path_relative': relpath(str(self.path.resolve()), str(cfg.script_directory.resolve())),
+            'path_relative': relpath(str(self.path.resolve()), str(cfg.global_options.script_directory.resolve())),
             'file_type': 'directory' if self.path.is_dir() else 'file'
         }
 
@@ -622,5 +627,39 @@ class Git(Dependency):
         )
 
 
+class ModrinthProject(Dependency):
 
-# TODO: Modrinth
+    def __init__(self,
+                 project: p.Project,
+                 name: str,
+                 version_check: bool,
+                 deployment: _DEPLOYMENT,
+                 id_or_slug: str,
+                 *,
+                 featured: Optional[bool] = True):
+        super().__init__(project, name, version_check, deployment)
+        self.id_or_slug: str = id_or_slug
+        self.featured: Optional[bool] = featured
+
+        # Get project info. Will call project.fail() if anything goes wrong
+        self.modrinth_project: modrinth.Project = modrinth.Project.from_slug(id_or_slug,
+                                                                             options=cfg.global_options.modrinth_options)
+        if project.has_failed():
+            return
+
+        # Get version info. Will call project.fail() if anything goes wrong
+        # TODO
+        # matching_versions: list[modrinth.Version] =
+        # self.version: modrinth.Version = self.modrinth_project.lis
+
+
+    def acquire(self, project: p.Project):
+        pass
+
+
+    def identity(self) -> dict:
+        pass
+
+
+    def matches_identity(self, identity: dict) -> bool:
+        pass

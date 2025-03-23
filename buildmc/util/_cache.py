@@ -11,7 +11,7 @@ from .. import config as cfg
 def cache_clean_all():
     """Clear all cache directories"""
 
-    for cache_sub_dir in (cfg.buildmc_root / 'cache').iterdir():
+    for cache_sub_dir in (cfg.global_options.buildmc_root / 'cache').iterdir():
         cache_clean(cache_sub_dir)
 
 
@@ -24,7 +24,7 @@ def cache_clean(name: Path) -> bool:
 
     # The cache *could* be a relative start with '../', but we want to
     # make sure our path stays inside 'buildmc_root/cache/'
-    cache_path = m.require_within(cfg.buildmc_root / 'cache' / name, cfg.buildmc_root / 'cache')
+    cache_path = m.require_within(cfg.global_options.buildmc_root / 'cache' / name, cfg.global_options.buildmc_root / 'cache')
 
     if cache_path is None:
         # Is None if the require_within_project check above failed
@@ -63,7 +63,7 @@ def cache_get(name: Path, clean: bool) -> Optional[Path]:
 
     # The cache *could* be a relative start with '../', but we want to
     # make sure our path stays inside 'buildmc_root/cache/'
-    dir_path = m.require_within(cfg.buildmc_root / 'cache' / name, cfg.buildmc_root / 'cache')
+    dir_path = m.require_within(cfg.global_options.buildmc_root / 'cache' / name, cfg.global_options.buildmc_root / 'cache')
 
     # Clean, if asked
     if clean and not cache_clean(name):

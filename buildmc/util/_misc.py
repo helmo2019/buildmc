@@ -1,11 +1,12 @@
 """Miscellaneous functions"""
 
+from sys import stderr, stdout
+
 import json
 import shutil
 from json.decoder import JSONDecodeError
 from pathlib import Path
-from sys import stderr, stdout
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from buildmc import config as cfg
 from buildmc.util import ansi
@@ -48,7 +49,7 @@ def require_within(file: Path, containing: Path) -> Optional[Path]:
     if containing in file.parents:
         return file
     else:
-        log(f"File '{file}' ('{file.resolve()}') is outside '{cfg.script_directory}'",
+        log(f"File '{file}' ('{file.resolve()}') is outside '{cfg.global_options.script_directory}'",
             log_error)
         return None
 
@@ -62,7 +63,7 @@ def require_within_project(file: Path) -> Optional[Path]:
     :return: The given file path, if it's inside the project root directory, None otherwise.
     """
 
-    return require_within(file, cfg.script_directory)
+    return require_within(file, cfg.global_options.script_directory)
 
 
 def get_json(file_path: Path) -> Optional[dict]:
@@ -97,6 +98,20 @@ def get_json_string(json_data: str) -> Optional[dict]:
         return None
 
 
+def any_match(items: list[Any], condition: Callable[[Any], bool]) -> bool:
+    for item in items:
+        if condition(item):
+            return True
+    return False
+
+
+def all_match(items: list[Any], condition: Callable[[Any], bool]) -> bool:
+    for item in items:
+        if not condition(item):
+            return False
+    return True
+
+
 # Logging
 
 log_info = 0
@@ -104,6 +119,7 @@ log_heading = 1
 log_sub_heading = 2
 log_warn = 10
 log_error = 11
+
 
 def log(msg: str, level: int = log_info, flush: bool = False):
     """Print styled log message to appropriate output stream"""

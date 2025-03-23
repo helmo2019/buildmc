@@ -16,14 +16,14 @@ def main(project_class: Type[api.Project], build_script_file_name: str):
     """
 
     # Set root directory
-    cfg.reset()
-
-    cfg.script_directory = Path(build_script_file_name).parent
-    cfg.buildmc_root = cfg.script_directory / '.buildmc'
-    chdir(str(cfg.script_directory.resolve()))
+    cfg.global_options.script_directory = Path(build_script_file_name).parent
+    cfg.global_options.buildmc_root = cfg.global_options.script_directory / '.buildmc'
+    chdir(str(cfg.global_options.script_directory.resolve()))
 
     # Configure project
     project = project_class()
+
+    cfg.global_options.modrinth_options.error_callback = project.fail
 
 
     def show_help():

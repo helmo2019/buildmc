@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Callable, Union
 from zipfile import ZipFile
 
-from buildmc.util import ansi, cache_clean_all, cache_get, log, log_heading, log_sub_heading, cache_clean
+from buildmc.util import ansi, cache_clean_all, cache_get, log, log_heading, cache_clean
 from . import _project as p
 
 
@@ -20,7 +20,7 @@ def variables(project: p.Project):
     project.ensure_completed(project.project)
 
     log(f'Project variables:{ansi.reset}' + (''.join(
-            [f"\n  {ansi.gray}'{var_name}'{ansi.reset} = {repr(project.var_get(var_name))}"
+            [f"\n  {ansi.gray}'{var_name}'{ansi.reset} = {str(project.var_get(var_name))}"
              for var_name in project.var_list()]
     )), log_heading)
 

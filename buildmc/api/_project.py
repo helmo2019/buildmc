@@ -6,9 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Optional
 
-import buildmc.util.ansi
 from buildmc import config as cfg
-from buildmc.util import log, log_error, log_heading, log_warn, pack_format_of
+from buildmc.util import Version, ansi, log, log_error, log_heading, log_warn, pack_formats_of, all_match
 from . import _classes as c, dependency
 
 
@@ -25,13 +24,14 @@ class Project(ABC):
 
     def __init__(self):
         # Dependency manager
-        self.dependency_index = dependency.DependencyIndex(self, cfg.buildmc_root / 'dependencies')
+        self.dependency_index = dependency.DependencyIndex(self, cfg.global_options.buildmc_root / 'dependencies')
 
         # Project meta
         self.__variables: dict[str, Any] = { }
         self.__project_name: Optional[str] = None
         self.__project_version: Optional[str] = None
-        self.__pack_format: Optional[int] = None
+        self.__pack_format: Optional[Version] = None
+        self.__supported_pack_formats: Optional[tuple[Version, Version]] = None
         self.__pack_type: Optional[Literal['data', 'resource']] = None
 
         # Files to be included in the pack build. Relative to <root dir>/../
@@ -86,47 +86,78 @@ class Project(ABC):
             log(f"Invalid pack type '{pack_type}', expected 'data' or 'resource'", log_error)
 
 
-    def pack_format(self, pack_format: int | str):
+    def __validate_pack_format(self, pack_format: int) -> bool:
+        """
+        Verifies that the given pack format is valid and compatible
+        with the project's pack type.
+        """
+
+        if not isinstance(pack_format, int):
+            log(f"Expected type int for to-be-validated pack format, but got '{type(pack_format)}'")
+            self.fail()
+            return False
+
+        if self.__pack_type == 'data':
+            # Validation for data pack
+            if pack_format >= 4:
+                return True
+            else:
+                log(f'Minimum pack format for data packs is 4, but {pack_format} was given!', log_error)
+                self.fail()
+                return False
+        else:
+            # Validation for resource pack
+            if pack_format >= 1:
+                return True
+            else:
+                log(f'Minimum pack format for resource packs is 1, but {pack_format} was given!', log_error)
+                self.fail()
+                return False
+
+
+    def pack_format(self, main: str, *, min_inclusive: Optional[str] = None, max_inclusive: Optional[str] = None):
         """
         Set the pack format number for the project. If the given
         pack_format is invalid, the project's pack format is set
-        to None.
+        to None. Additionally, *both* min_inclusive and max_inclusive
+        may be specified.
 
-        :param pack_format: Either a literal pack format number or a version name
+        :param main: Either a literal pack format number or a version name
+        :param min_inclusive: Optional. Minimum compatible version
+        :param max_inclusive: Optional. Maximum compatible version
         """
 
-        if isinstance(pack_format, int) or isinstance(pack_format, str):
-            if self.__pack_type is None:
-                log("Cannot set the project's pack format if the project's pack type is not yet defined!", log_error)
-            else:
-                if isinstance(pack_format, int):
-                    # Literal pack format
-                    if self.__pack_type == 'data':
-                        # Validation for data pack
-                        if pack_format >= 4:
-                            self.__pack_format = pack_format
-                        else:
-                            log(f'Minimum pack format for data packs is 4, but {pack_format} was given. Value remains '
-                                f'at '
-                                f'{self.__pack_format}',
-                                log_error)
-                    else:
-                        # Validation for resource pack
-                        if pack_format >= 1:
-                            self.__pack_format = pack_format
-                        else:
-                            log(f'Minimum pack format for resource packs is 0, but {pack_format} was given. Value '
-                                f'remains at '
-                                f'{self.__pack_format}', log_error)
-                elif isinstance(pack_format, str):
-                    # Version name
-                    log(f'Looking up {self.__pack_type} pack format number for {pack_format} ...')
-                    if looked_up := pack_format_of(pack_format, self.__pack_type):
-                        # pack_format_of should take care of all error logging
-                        self.pack_format(looked_up)
+        if self.__pack_type is None:
+            log("Cannot set supported pack format(s) if the pack type hasn't been set yet!", log_error)
+            self.fail()
+            return
 
+        if isinstance(main, int):
+            log(f'Got literal pack format number {main} as pack format. Modrinth dependencies {ansi.bold}will not'
+                f" work{ansi.not_bold} if the pack format hasn't been set from a version name!", log_warn)
+
+        if not (bool(min_inclusive) and bool(max_inclusive)) and (bool(min_inclusive) or bool(max_inclusive)):
+            log(f'Incorrect usage of pack_format: Either {ansi.bold}both{ansi.not_bold} {ansi.italic}min_inclusive'
+                f'{ansi.not_italic} and {ansi.italic}max_inclusive{ansi.not_italic} may be specified, {ansi.bold}or'
+                f'{ansi.not_bold} neither.', log_error)
+            self.fail()
+            return
+
+        if bool(min_inclusive) and bool(max_inclusive):
+            resolved = pack_formats_of([main, min_inclusive, max_inclusive], self.__pack_type)
+
+            if len(resolved) == 3 and all_match(resolved, self.__validate_pack_format):
+                self.__pack_format = Version(self.__pack_type, main, resolved[0])
+                self.__supported_pack_formats = (Version(self.__pack_type, min_inclusive, resolved[1]),
+                                                 Version(self.__pack_type, max_inclusive, resolved[2]))
+            else:
+                self.fail()
         else:
-            log(f'pack_format should be int or str, but is {type(pack_format)}', log_error)
+            main_format = pack_formats_of([main], self.__pack_type)
+            if len(main_format) == 1 and self.__validate_pack_format(main_format[0]):
+                self.__pack_format = Version(self.__pack_type, main, main_format[0])
+            else:
+                self.fail()
 
 
     def var_set(self, name: str, value: Any):
@@ -204,7 +235,7 @@ class Project(ABC):
         :param glob: Whether to enable UNIX style globbing (e.g. './**/*.txt')
         """
 
-        included = list(cfg.script_directory.rglob(pattern)) if glob else [Path(pattern)]
+        included = list(cfg.global_options.script_directory.rglob(pattern)) if glob else [Path(pattern)]
 
         if len(included) == 0:
             log(f"No file matched the pattern '{pattern}'", log_error)
@@ -220,21 +251,21 @@ class Project(ABC):
 
             # Only include files, not directories;
             # And do not include files from buildmc_root
-            if not file.is_file() or (cfg.buildmc_root in file.parents):
+            if not file.is_file() or (cfg.global_options.buildmc_root in file.parents):
                 continue
 
             # Set destination correctly
             if destination is None:
-                if cfg.script_directory in file.parents:
+                if cfg.global_options.script_directory in file.parents:
                     # File is inside the script's directory
-                    destination_path = file.relative_to(cfg.script_directory)
+                    destination_path = file.relative_to(cfg.global_options.script_directory)
                 else:
                     # File is outside the script's directory
                     log(f"Including file which is outside of the project root: '{file.resolve()}'", log_warn)
                     destination_path = Path(file.name)
             else:
                 # Print error if outside root
-                if cfg.script_directory not in file.parents:
+                if cfg.global_options.script_directory not in file.parents:
                     log(f"Including file which is outside of the project root: '{file.resolve()}'", log_warn)
 
                 # Manually set destination
@@ -257,7 +288,8 @@ class Project(ABC):
         :param by_destination: Whether to remove pack file entries whose destination paths matches the pattern
         """
 
-        excluded = [(file if by_destination else file.resolve()) for file in cfg.script_directory.rglob(pattern)]
+        excluded = [(file if by_destination else file.resolve()) for file in
+                    cfg.global_options.script_directory.rglob(pattern)]
         self.__pack_files = [entry for entry in self.__pack_files if
                              ((by_destination and entry.destination not in excluded)
                               or (not by_destination and entry.source not in excluded))]
@@ -281,6 +313,9 @@ class Project(ABC):
 
     def ensure_completed(self, function: Callable):
         """Ensure that a project function has been executed"""
+
+        if self.has_failed():
+            return
 
         if not function in self.__completed:
             log(f"Unknown state '{str(function)}'", log_error)
@@ -405,7 +440,7 @@ class ProjectFile:
                 # Reached end-of-file while looking for closing '}'
                 if not peek():
                     log(f"While processing '{self.source}': Reached end-of-file while looking for closing '}}' for"
-                        f" '{buildmc.util.ansi.gray}%{{{buffer[:10]}{buildmc.util.ansi.reset} ...'", log_error)
+                        f" '{ansi.gray}%{{{buffer[:10]}{ansi.reset} ...'", log_error)
                     project.fail()
                     break
 

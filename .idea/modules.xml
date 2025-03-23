@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/buildmc.iml" filepath="$PROJECT_DIR$/.idea/buildmc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../modrinth-python/.idea/modrinth-python.iml" filepath="$PROJECT_DIR$/../modrinth-python/.idea/modrinth-python.iml" />
     </modules>
   </component>
 </project>
