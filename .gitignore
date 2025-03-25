@@ -1,3 +1,4 @@
 .venv
 tests/buildmc_debug
 testing_env/.buildmc
+**/__pycache__

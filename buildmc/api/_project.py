@@ -4,10 +4,11 @@ import shutil
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Optional
+from typing import Any, Callable, Iterable, Literal, Optional, TYPE_CHECKING
 
 from buildmc import config as cfg
 from buildmc.util import Version, ansi, log, log_error, log_heading, log_warn, pack_formats_of, all_match
+from buildmc.meta_extractor import aliased_version_name
 from . import _classes as c, dependency
 
 
@@ -18,6 +19,8 @@ class Project(ABC):
         'project/name': lambda p: p.__project_name,
         'project/version': lambda p: p.__project_version,
         'project/pack_format': lambda p: p.__pack_format,
+        'project/supported_formats': lambda p: p.__supported_pack_formats,
+        'project/pack_format_section': lambda p: p.__gen_pack_format_json(),
         'project/pack_type': lambda p: p.__pack_type
     }
 
@@ -86,6 +89,16 @@ class Project(ABC):
             log(f"Invalid pack type '{pack_type}', expected 'data' or 'resource'", log_error)
 
 
+    def __gen_pack_format_json(self) -> str:
+        """Generates the pack_format and supported_formats sections for pack.mcmeta"""
+
+        result: str = f'        "pack_format": {self.__pack_format.format_number}'
+        if self.__supported_pack_formats is not None:
+            result = (f'{result},\n        "supported_formats": [ {self.__supported_pack_formats[0].format_number},'
+                      f' {self.__supported_pack_formats[1].format_number} ]')
+        return result
+
+
     def __validate_pack_format(self, pack_format: int) -> bool:
         """
         Verifies that the given pack format is valid and compatible
@@ -144,18 +157,18 @@ class Project(ABC):
             return
 
         if bool(min_inclusive) and bool(max_inclusive):
-            resolved = pack_formats_of([main, min_inclusive, max_inclusive], self.__pack_type)
+            resolved: Optional[list[int]] = pack_formats_of([main, min_inclusive, max_inclusive], self.__pack_type)
 
-            if len(resolved) == 3 and all_match(resolved, self.__validate_pack_format):
-                self.__pack_format = Version(self.__pack_type, main, resolved[0])
-                self.__supported_pack_formats = (Version(self.__pack_type, min_inclusive, resolved[1]),
-                                                 Version(self.__pack_type, max_inclusive, resolved[2]))
+            if resolved is not None and all_match(resolved, self.__validate_pack_format):
+                self.__pack_format = Version(self.__pack_type, aliased_version_name(main), resolved[0])
+                self.__supported_pack_formats = (Version(self.__pack_type, aliased_version_name(min_inclusive), resolved[1]),
+                                                 Version(self.__pack_type, aliased_version_name(max_inclusive), resolved[2]))
             else:
                 self.fail()
         else:
             main_format = pack_formats_of([main], self.__pack_type)
             if len(main_format) == 1 and self.__validate_pack_format(main_format[0]):
-                self.__pack_format = Version(self.__pack_type, main, main_format[0])
+                self.__pack_format = Version(self.__pack_type, aliased_version_name(main), main_format[0])
             else:
                 self.fail()
 

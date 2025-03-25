@@ -18,7 +18,7 @@ class Project(api.Project):
         self.project_name('TestingProject')
         self.project_version('1.0-DEBUG')
         self.pack_type('data')
-        self.pack_format('1.21.4', min_inclusive='1.20', max_inclusive='1.21.4')
+        self.pack_format('1.14.2 Pre-Release 2', min_inclusive='1.14.2 Pre-Release 2', max_inclusive='1.21.4')
         self.var_set('custom_variable', 'Hello World!')
 
 

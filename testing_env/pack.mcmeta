@@ -3,7 +3,6 @@
         "description": [
             {
                 "text": "%{project/name}\n",
-                "extra": [],
                 "color": "aqua"
             },
             {
@@ -11,6 +10,6 @@
                 "color": "gold"
             }
         ],
-        "pack_format": %{project/pack_format}
+        %{project/pack_format_section}
     }
 }
