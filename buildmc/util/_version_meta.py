@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional
 
-from . import _cache as c, _download as d, _misc as m, log_error
+from . import _cache as c, _download as d, _misc as m
 from .. import config as cfg, meta_extractor
 
 
@@ -17,6 +17,7 @@ class Version:
 
     def __str__(self):
         return f"{self.version_name} ({self.pack_type} pack format {self.format_number})"
+
 
 
 def pack_formats_of(version_names: list[str], format_type: str) -> Optional[list[int]]:
@@ -127,7 +128,7 @@ def _update_version_meta_index(file_path: Path, real_version_names: list[str]) -
     elif not m.all_match(real_version_names, lambda name: name in json_data):
         m.log(
                 f"Unable to obtain version meta for '{real_version_names}'. Are they spelled correctly? Are they"
-                " listed in Mojang's version manifest?", log_error)
+                " listed in Mojang's version manifest?", m.log_error)
         return False
     else:
         # If we've made it here, we can now, *at last*, report that we've updated the version metadata index

@@ -6,7 +6,7 @@ import json
 import shutil
 from json.decoder import JSONDecodeError
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 from buildmc import config as cfg
 from buildmc.util import ansi
@@ -98,18 +98,26 @@ def get_json_string(json_data: str) -> Optional[dict]:
         return None
 
 
-def any_match(items: list[Any], condition: Callable[[Any], bool]) -> bool:
+def any_match(items: Iterable[Any], condition: Callable[[Any], bool]) -> bool:
     for item in items:
         if condition(item):
             return True
     return False
 
 
-def all_match(items: list[Any], condition: Callable[[Any], bool]) -> bool:
+def all_match(items: Iterable[Any], condition: Callable[[Any], bool]) -> bool:
     for item in items:
         if not condition(item):
             return False
     return True
+
+
+def count_matching(items: Iterable[Any], condition: Callable[[Any], bool]) -> int:
+    n = 0
+    for item in items:
+        if condition(item):
+            n += 1
+    return n
 
 
 # Logging

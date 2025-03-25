@@ -2,6 +2,7 @@
 
 from .main import main
 from .transform import main as transformer
+from .version_list import main as version_list_generator
 
 
 aliases = {

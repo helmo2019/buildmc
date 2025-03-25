@@ -4,11 +4,13 @@ import shutil
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Optional, TYPE_CHECKING
+from typing import Any, Callable, Iterable, Literal, Optional
 
 from buildmc import config as cfg
-from buildmc.util import Version, ansi, log, log_error, log_heading, log_warn, pack_formats_of, all_match
-from buildmc.meta_extractor import aliased_version_name
+from buildmc.meta_extractor import aliased_version_name, version_list_generator
+from buildmc.util import (Version, all_match, ansi, cache_clean, cache_get, count_matching, log, log_error, log_heading,
+                          log_warn,
+                          pack_formats_of)
 from . import _classes as c, dependency
 
 
@@ -128,6 +130,52 @@ class Project(ABC):
                 return False
 
 
+    def __version_range(self, included: list[str], *, list_updated: bool = False) -> Optional[list[str]]:
+        """
+        Uses buildmc.meta_extractor.version_list to compile a list of all game
+        versions ordered by release
+        """
+
+        if not (cache := cache_get(Path('version_list'), False)):
+            return None
+
+        list_file: Path = cache / 'version_list.txt'
+
+        if list_file.exists():
+            if not list_file.is_file():
+                # You never know.
+                cache_clean(Path('version_list'))
+                return self.__version_range(included)
+            elif not list_updated:
+                version_list: list[str] = list_file.read_text().splitlines()
+
+                # Map (item from included) -> (found index)
+                found: dict[str, int] = { ver: -1 for ver in included }
+
+                # Search indices
+                for i in range(len(version_list)):
+                    if version_list[i] in included:
+                        found[version_list[i]] = i
+
+                # If less than two indices were found, delete the
+                # file and restart function
+                if count_matching(found.values(), lambda x: x != -1) < 2:
+                    list_file.unlink()
+                    return self.__version_range(included)
+                else:
+                    return version_list[min(found.values()):max(found.values())]
+
+        else:
+            if not list_updated:
+                version_list_generator(list_file, error_callback=self.fail, error_log=lambda msg: log(msg, log_error))
+                return self.__version_range(included, list_updated=True)
+            else:
+                log(f'Versions {included} not found in ordered version list!', log_error)
+                self.fail()
+                return None
+
+
+
     def pack_format(self, main: str, *, min_inclusive: Optional[str] = None, max_inclusive: Optional[str] = None):
         """
         Set the pack format number for the project. If the given
@@ -161,8 +209,9 @@ class Project(ABC):
 
             if resolved is not None and all_match(resolved, self.__validate_pack_format):
                 self.__pack_format = Version(self.__pack_type, aliased_version_name(main), resolved[0])
-                self.__supported_pack_formats = (Version(self.__pack_type, aliased_version_name(min_inclusive), resolved[1]),
-                                                 Version(self.__pack_type, aliased_version_name(max_inclusive), resolved[2]))
+                self.__supported_pack_formats = (
+                    Version(self.__pack_type, aliased_version_name(min_inclusive), resolved[1]),
+                    Version(self.__pack_type, aliased_version_name(max_inclusive), resolved[2]))
             else:
                 self.fail()
         else:
