@@ -19,6 +19,9 @@ def variables(project: p.Project):
 
     project.ensure_completed(project.project)
 
+    if project.has_failed():
+        return
+
     log(f'Project variables:{ansi.reset}' + (''.join(
             [f"\n  {ansi.gray}'{var_name}'{ansi.reset} = {str(project.var_get(var_name))}"
              for var_name in project.var_list()]
@@ -29,6 +32,9 @@ def files(project: p.Project):
     """Print out files included in project build"""
 
     project.ensure_completed(project.included_files)
+
+    if project.has_failed():
+        return
 
     log(f'Project files:{ansi.reset}' + (''.join(
             [f"\n  {ansi.gray}'{project_file.source}'{ansi.reset}\n   → "
@@ -44,6 +50,9 @@ def build(project: p.Project):
     project.ensure_completed(project.project)
     project.ensure_completed(project.included_files)
     project.ensure_completed(project.dependencies)
+
+    if project.has_failed():
+        return
 
     if not project.has_failed():
         log(f'Building project {project.var_get("project/name")}', log_heading)
