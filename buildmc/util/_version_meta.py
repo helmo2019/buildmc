@@ -69,7 +69,7 @@ def pack_formats_of(version_names: list[str], format_type: str) -> Optional[list
             if isinstance(version_meta, dict):
                 result.append(version_meta[format_type])
             else:
-                return result.append(version_meta)
+                result.append(version_meta)
 
         return result
 
