@@ -27,7 +27,7 @@ aliases = {
 }
 
 
-def real_version_name(version_name: str):
+def real_version_name(version_name: str) -> str:
     """
     Get the real name of a version
 
@@ -36,3 +36,15 @@ def real_version_name(version_name: str):
     """
 
     return aliases[version_name] if version_name in aliases else version_name
+
+
+def aliased_version_name(version_name: str) -> str:
+    """
+    Try to find the alias for a version name. If none
+    is found, the given version name is returned as-is.
+    """
+
+    for key, value in aliases.items():
+        if value == version_name:
+            return key
+    return version_name
