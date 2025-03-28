@@ -648,9 +648,18 @@ class ModrinthProject(Dependency):
             return
 
         # Get version info. Will call project.fail() if anything goes wrong
-        # TODO
-        # matching_versions: list[modrinth.Version] =
-        # self.version: modrinth.Version = self.modrinth_project.lis
+        matching_versions: list[modrinth.Version] = self.modrinth_project.list_versions(
+                mc_versions=project.var_get('project/supported_versions'))
+        if project.has_failed() or len(matching_versions) == 0:
+            # Called by list_versions if anything goes wrong (via error_callback
+            # in config.global_options.modrinth_options)
+            return
+        # Use last-published version
+        # TODO transitive dependencies, download optional/required resource
+        # TODO packs etc
+        self.modrinth_version: modrinth.Version = max(matching_versions)
+        self.url_dependency: URL = URL(project, f'modrinth_version_{self.modrinth_version.id}',
+                                       version_check, deployment, self.modrinth_version.)
 
 
     def acquire(self, project: p.Project):

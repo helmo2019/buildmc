@@ -1,7 +1,7 @@
 """Project tasks"""
 
 from pathlib import Path
-from typing import Callable, Union
+from typing import Callable, Iterable, Union
 from zipfile import ZipFile
 
 from buildmc.util import ansi, cache_clean_all, cache_get, log, log_heading, cache_clean
@@ -23,8 +23,15 @@ def variables(project: p.Project):
         return
 
     log(f'Project variables:{ansi.reset}' + (''.join(
-            [f"\n  {ansi.gray}'{var_name}'{ansi.reset} = {str(project.var_get(var_name))}"
-             for var_name in project.var_list()]
+            [
+                (
+                        f"\n  {ansi.gray}'{var_name}'{ansi.reset} = " +
+                        (', '.join(map(str, project.var_get(var_name)))
+                         if isinstance(project.var_get(var_name), list|tuple) else
+                         str(project.var_get(var_name)))
+                )
+                for var_name in project.var_list()
+            ]
     )), log_heading)
 
 

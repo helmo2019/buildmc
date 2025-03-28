@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Optional
 
 from buildmc import config as cfg
-from buildmc.meta_extractor import aliased_version_name, version_list_generator
+from buildmc.meta_extractor import aliased_version_name, real_version_name, version_list_generator
 from buildmc.util import (Version, all_match, ansi, cache_clean, cache_get, count_matching, log, log_error, log_heading,
                           log_warn,
                           pack_formats_of)
@@ -22,6 +22,7 @@ class Project(ABC):
         'project/version': lambda p: p.__project_version,
         'project/pack_format': lambda p: p.__pack_format,
         'project/supported_formats': lambda p: p.__supported_pack_formats,
+        'project/supported_versions': lambda p: p.__supported_versions,
         'project/pack_format_section': lambda p: p.__gen_pack_format_json(),
         'project/pack_type': lambda p: p.__pack_type
     }
@@ -37,6 +38,7 @@ class Project(ABC):
         self.__project_version: Optional[str] = None
         self.__pack_format: Optional[Version] = None
         self.__supported_pack_formats: Optional[tuple[Version, Version]] = None
+        self.__supported_versions: Optional[list[str]] = None
         self.__pack_type: Optional[Literal['data', 'resource']] = None
 
         # Files to be included in the pack build. Relative to <root dir>/../
@@ -208,10 +210,26 @@ class Project(ABC):
             resolved: Optional[list[int]] = pack_formats_of([main, min_inclusive, max_inclusive], self.__pack_type)
 
             if resolved is not None and all_match(resolved, self.__validate_pack_format):
-                self.__pack_format = Version(self.__pack_type, aliased_version_name(main), resolved[0])
-                self.__supported_pack_formats = (
-                    Version(self.__pack_type, aliased_version_name(min_inclusive), resolved[1]),
-                    Version(self.__pack_type, aliased_version_name(max_inclusive), resolved[2]))
+                main_version: Version = Version(self.__pack_type, aliased_version_name(main), resolved[0])
+                min_version: Version = Version(self.__pack_type, aliased_version_name(min_inclusive), resolved[1])
+                max_version: Version = Version(self.__pack_type, aliased_version_name(max_inclusive), resolved[2])
+
+                if not min_version.format_number < max_version.format_number:
+                    log(f'Invalid pack format: expected min_inclusive < max_inclusive', log_error)
+                    self.fail()
+                    return
+                elif not min_version.format_number <= main_version.format_number <= max_version.format_number:
+                    log(f'Invalid pack format: expected min_inclusive ≤ main ≤ max_inclusive', log_error)
+                    self.fail()
+                    return
+
+                self.__pack_format = main_version
+                self.__supported_pack_formats = (min_version, max_version)
+                self.__supported_versions = self.__version_range([
+                    real_version_name(max_version.version_name),
+                    real_version_name(main_version.version_name),
+                    real_version_name(min_version.version_name)
+                ])
             else:
                 self.fail()
         else:
