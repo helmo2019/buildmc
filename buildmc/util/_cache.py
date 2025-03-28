@@ -11,7 +11,10 @@ from .. import config as cfg
 def cache_clean_all():
     """Clear all cache directories"""
 
-    for cache_sub_dir in (cfg.global_options.buildmc_root / 'cache').iterdir():
+    if not (caches_dir := cfg.global_options.buildmc_root / 'cache').is_dir():
+        return
+
+    for cache_sub_dir in caches_dir.iterdir():
         cache_clean(cache_sub_dir)
 
 

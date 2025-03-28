@@ -19,6 +19,7 @@ def main(project_class: Type[api.Project], build_script_file_name: str):
     cfg.global_options.script_directory = Path(build_script_file_name).parent
     cfg.global_options.buildmc_root = cfg.global_options.script_directory / '.buildmc'
     chdir(str(cfg.global_options.script_directory.resolve()))
+    cfg.global_options.buildmc_root.mkdir(parents=True, exist_ok=True)
 
     # Configure project
     project = project_class()

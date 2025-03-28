@@ -36,6 +36,7 @@ class DependencyIndex:
 
         self.project = project
         self.managed_path = managed_path
+        self.managed_path.mkdir(parents=True, exist_ok=True)
 
         # Read index data
         index_data: dict = get_json(managed_path / DependencyIndex.__index_file_name)
@@ -637,29 +638,36 @@ class ModrinthProject(Dependency):
                  id_or_slug: str,
                  *,
                  featured: Optional[bool] = True):
+
         super().__init__(project, name, version_check, deployment)
-        self.id_or_slug: str = id_or_slug
-        self.featured: Optional[bool] = featured
+        raise AssertionError('Modrinth dependencies not implemented yet :)')
 
-        # Get project info. Will call project.fail() if anything goes wrong
-        self.modrinth_project: modrinth.Project = modrinth.Project.from_slug(id_or_slug,
-                                                                             options=cfg.global_options.modrinth_options)
-        if project.has_failed():
-            return
 
-        # Get version info. Will call project.fail() if anything goes wrong
-        matching_versions: list[modrinth.Version] = self.modrinth_project.list_versions(
-                mc_versions=project.var_get('project/supported_versions'))
-        if project.has_failed() or len(matching_versions) == 0:
-            # Called by list_versions if anything goes wrong (via error_callback
-            # in config.global_options.modrinth_options)
-            return
-        # Use last-published version
-        # TODO transitive dependencies, download optional/required resource
-        # TODO packs etc
-        self.modrinth_version: modrinth.Version = max(matching_versions)
-        self.url_dependency: URL = URL(project, f'modrinth_version_{self.modrinth_version.id}',
-                                       version_check, deployment, self.modrinth_version.)
+        # self.id_or_slug: str = id_or_slug
+        # self.featured: Optional[bool] = featured
+        #
+        # # Get project info. Will call project.fail() if anything goes wrong
+        # self.modrinth_project: modrinth.Project = modrinth.Project.from_slug(id_or_slug,
+        #                                                                      options=cfg.global_options.modrinth_options)
+        # if project.has_failed():
+        #     return
+        #
+        # # Get version info. Will call project.fail() if anything goes wrong
+        # matching_versions: list[modrinth.Version] = self.modrinth_project.list_versions(
+        #         mc_versions=project.var_get('project/supported_versions'))
+        # if project.has_failed() or len(matching_versions) == 0:
+        #     # Called by list_versions if anything goes wrong (via error_callback
+        #     # in config.global_options.modrinth_options)
+        #     return
+        # # Use last-published version
+        # # TODO transitive dependencies, download optional/required resource
+        # # TODO packs etc
+        # TODO modrinth package manager ...
+        # self.modrinth_version: modrinth.Version = max(matching_versions)
+        # self.url_dependency: URL = URL(project, f'modrinth_version_{self.modrinth_version.id}',
+        #                                version_check, deployment, self.modrinth_version.primary_file)
+
+
 
 
     def acquire(self, project: p.Project):

@@ -57,6 +57,7 @@ def build(project: p.Project):
     project.ensure_completed(project.project)
     project.ensure_completed(project.included_files)
     project.ensure_completed(project.dependencies)
+    project.ensure_completed(project.dependency_index.resolve_dependencies)
 
     if project.has_failed():
         return
